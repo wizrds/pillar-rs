@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use futures::stream::BoxStream;
 use arrow::record_batch::RecordBatch;
 
-use crate::{errors::Error, ast::Statement};
+use crate::{errors::Error, ast::Statement, value::Value};
 
 
 #[derive(Debug, Clone, PartialEq)]
@@ -81,9 +81,15 @@ pub enum Feature {
     NestedTypes,
 }
 
+#[derive(Debug, Clone)]
+pub struct PreparedStatement {
+    pub sql: String,
+    pub params: Vec<Value>,
+}
+
 pub trait Dialect: Send + Sync {
     fn name(&self) -> &'static str;
-    fn transpile(&self, statement: &Statement) -> Result<String, Error>;
+    fn transpile(&self, statement: &Statement) -> Result<PreparedStatement, Error>;
     fn supports_feature(&self, feature: Feature) -> bool;
     fn quote_identifier(&self, identifier: &str) -> String;
     fn parameter_placeholder(&self, index: usize) -> String;

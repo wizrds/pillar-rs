@@ -32,10 +32,7 @@ certs/
 
 # Testing scripts
 scripts/
-enroute-test/
-
-# Repomix
-repomix.output.md
-
-doclayer-test/
 compose/
+
+# Agent tasks
+.agent

@@ -260,7 +260,7 @@ impl SelectStatement {
 pub struct InsertStatement {
     pub table: TableRef,
     pub columns: Vec<String>,
-    pub values: Vec<Value>,
+    pub values: Vec<Vec<Value>>,
     pub on_conflict: Option<OnConflict>,
 }
 
@@ -279,7 +279,7 @@ impl InsertStatement {
         self
     }
 
-    pub fn values(mut self, values: Vec<Value>) -> Self {
+    pub fn values(mut self, values: Vec<Vec<Value>>) -> Self {
         self.values = values;
         self
     }
