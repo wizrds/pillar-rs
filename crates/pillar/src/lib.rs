@@ -8,3 +8,8 @@ pub mod macros {
 }
 
 pub use pillar_core::*;
+
+#[cfg(feature = "duckdb")]
+pub mod duckdb {
+    pub use pillar_duckdb::*;
+}

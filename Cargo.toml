@@ -11,6 +11,7 @@ resolver = "2"
 members = [
     "crates/pillar-macros",
     "crates/pillar-core",
+    "crates/pillar-duckdb",
     "crates/pillar",
 ]
 exclude = [

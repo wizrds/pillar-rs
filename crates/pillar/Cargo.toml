@@ -10,6 +10,7 @@ readme.workspace = true
 [dependencies]
 pillar-macros = { path = "../pillar-macros", version = "0.0.0" }
 pillar-core = { path = "../pillar-core", version = "0.0.0", default-features = false }
+pillar-duckdb = { path = "../pillar-duckdb", version = "0.0.0", default-features = false, optional = true }
 
 async-trait = { workspace = true }
 serde = { workspace = true }
@@ -18,5 +19,7 @@ thiserror = { workspace = true }
 
 [features]
 default = []
-chrono = ["pillar-core/chrono"]
-uuid = ["pillar-core/uuid"]
+chrono = ["pillar-core/chrono", "pillar-duckdb/chrono"]
+uuid = ["pillar-core/uuid", "pillar-duckdb/uuid"]
+duckdb = ["dep:pillar-duckdb"]
+duckdb-bundled = ["dep:pillar-duckdb", "pillar-duckdb/bundled"]
