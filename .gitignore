@@ -33,6 +33,7 @@ certs/
 # Testing scripts
 scripts/
 compose/
+crates/pillar-test
 
 # Agent tasks
 .agent

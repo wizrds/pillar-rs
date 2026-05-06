@@ -13,6 +13,9 @@ members = [
     "crates/pillar-core",
     "crates/pillar",
 ]
+exclude = [
+    "crates/pillar-test",
+]
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }

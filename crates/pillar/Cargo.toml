@@ -9,7 +9,7 @@ readme.workspace = true
 
 [dependencies]
 pillar-macros = { path = "../pillar-macros", version = "0.0.0" }
-pillar-core = { path = "../pillar-core", version = "0.0.0" }
+pillar-core = { path = "../pillar-core", version = "0.0.0", default-features = false }
 
 async-trait = { workspace = true }
 serde = { workspace = true }
@@ -18,3 +18,5 @@ thiserror = { workspace = true }
 
 [features]
 default = []
+chrono = ["pillar-core/chrono"]
+uuid = ["pillar-core/uuid"]

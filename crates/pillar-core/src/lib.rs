@@ -8,3 +8,9 @@ pub mod condition;
 pub mod column;
 pub mod query;
 pub mod traits;
+
+#[doc(hidden)]
+pub mod __private {
+    pub use arrow;
+    pub use serde_arrow;
+}
