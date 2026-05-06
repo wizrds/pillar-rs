@@ -1,0 +1,29 @@
+[package]
+name = "pillar-core"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+repository.workspace = true
+license.workspace = true
+readme.workspace = true
+
+[dependencies]
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+arrow = { workspace = true }
+serde_arrow = { workspace = true }
+
+thiserror = { workspace = true }
+mea = { workspace = true }
+futures = { workspace = true }
+
+hex = { version = "0.4" }
+
+chrono = { workspace = true, optional = true }
+uuid = { workspace = true, optional = true }
+
+[features]
+default = []
+chrono = ["dep:chrono"]
+uuid = ["dep:uuid"]

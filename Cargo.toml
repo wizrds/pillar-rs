@@ -1,0 +1,30 @@
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+description = "A thin ORM for columnar databases in Rust."
+repository = "https://github.com/wizrds/pillar-rs"
+license = "ISC"
+readme = "README.md"
+
+[workspace]
+resolver = "2"
+members = [
+    "crates/pillar-macros",
+    "crates/pillar-core",
+    "crates/pillar",
+]
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1" }
+arrow = { version = "58", features = ["json"]}
+serde_arrow = { version = "0.14", features = ["arrow-58"] }
+
+async-trait = { version = "0.1" }
+futures = { version = "0.3" }
+mea = { version = "0.6" }
+
+thiserror = { version = "2" }
+
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["serde", "v4"] }
