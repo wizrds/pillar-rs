@@ -4,8 +4,11 @@ use async_trait::async_trait;
 use crate::{
     ast::{
         AlterTableStatement,
+        CreateMaterializedViewStatement,
         CreateTableStatement,
+        CreateViewStatement,
         DropTableStatement,
+        DropViewStatement,
         Statement,
     },
     errors::Error,
@@ -37,6 +40,24 @@ impl<'a> MigrateOp<'a> {
     pub async fn drop_table(&self, stmt: DropTableStatement) -> Result<ExecutionResult, Error> {
         self.database
             .execute(&Statement::DropTable(stmt))
+            .await
+    }
+
+    pub async fn create_view(&self, stmt: CreateViewStatement) -> Result<ExecutionResult, Error> {
+        self.database
+            .execute(&Statement::CreateView(stmt))
+            .await
+    }
+
+    pub async fn create_materialized_view(&self, stmt: CreateMaterializedViewStatement) -> Result<ExecutionResult, Error> {
+        self.database
+            .execute(&Statement::CreateMaterializedView(stmt))
+            .await
+    }
+
+    pub async fn drop_view(&self, stmt: DropViewStatement) -> Result<ExecutionResult, Error> {
+        self.database
+            .execute(&Statement::DropView(stmt))
             .await
     }
 

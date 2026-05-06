@@ -27,6 +27,7 @@ use crate::{
     ast::{
         DeleteStatement,
         InsertStatement,
+        CreateMaterializedViewStatement,
         Join,
         JoinType,
         OrderBy,
@@ -42,7 +43,7 @@ use crate::{
     condition::{Condition, ConditionExpression},
     database::Database,
     model::Model,
-    view::MaterializedView,
+    view::{MaterializedView, ViewQuery},
     value::Value,
 };
 
@@ -647,6 +648,16 @@ pub trait View: MaterializedView + Sized {
         SelectView::new()
     }
 }
+
+pub trait DefinedView: ViewQuery + Sized {
+    fn create_statement() -> Statement {
+        Statement::CreateMaterializedView(
+            CreateMaterializedViewStatement::new(Self::view_name(), Self::query()),
+        )
+    }
+}
+
+impl<V: ViewQuery> DefinedView for V {}
 
 impl<V: MaterializedView> View for V {}
 

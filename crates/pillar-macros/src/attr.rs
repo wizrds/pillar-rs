@@ -17,6 +17,8 @@ pub struct ViewAttrs {
     pub generics: syn::Generics,
     pub data: ast::Data<util::Ignored, FieldAttrs>,
     pub view: Option<String>,
+    pub from: Option<String>,
+    pub filter: Option<String>,
 }
 
 #[derive(FromField)]

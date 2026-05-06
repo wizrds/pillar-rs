@@ -1,4 +1,6 @@
-use crate::{value::Value, condition::ConditionExpression};
+use std::collections::HashMap;
+
+use crate::{condition::ConditionExpression, value::Value};
 
 
 #[derive(Debug, Clone, PartialEq)]
@@ -168,6 +170,9 @@ pub enum Statement {
     CreateTable(CreateTableStatement),
     AlterTable(AlterTableStatement),
     DropTable(DropTableStatement),
+    CreateView(CreateViewStatement),
+    CreateMaterializedView(CreateMaterializedViewStatement),
+    DropView(DropViewStatement),
     Raw(String, Vec<Value>),
 }
 
@@ -343,8 +348,7 @@ pub struct CreateTableStatement {
     pub name: String,
     pub columns: Vec<ColumnDefinition>,
     pub if_not_exists: bool,
-    pub engine: Option<String>,
-    pub partition_by: Option<String>,
+    pub options: HashMap<String, String>,
 }
 
 impl CreateTableStatement {
@@ -353,8 +357,7 @@ impl CreateTableStatement {
             name: name.into(),
             columns: Vec::new(),
             if_not_exists: false,
-            engine: None,
-            partition_by: None,
+            options: HashMap::new(),
         }
     }
 
@@ -368,13 +371,8 @@ impl CreateTableStatement {
         self
     }
 
-    pub fn engine(mut self, engine: impl Into<String>) -> Self {
-        self.engine = Some(engine.into());
-        self
-    }
-
-    pub fn partition_by(mut self, partition_by: impl Into<String>) -> Self {
-        self.partition_by = Some(partition_by.into());
+    pub fn option(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.options.insert(key.into(), value.into());
         self
     }
 }
@@ -422,6 +420,112 @@ impl DropTableStatement {
 
     pub fn if_exists(mut self) -> Self {
         self.if_exists = true;
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CreateViewStatement {
+    pub name: String,
+    pub query: SelectStatement,
+    pub or_replace: bool,
+    pub if_not_exists: bool,
+    pub options: HashMap<String, String>,
+}
+
+impl CreateViewStatement {
+    pub fn new(name: impl Into<String>, query: SelectStatement) -> Self {
+        Self {
+            name: name.into(),
+            query,
+            or_replace: false,
+            if_not_exists: false,
+            options: HashMap::new(),
+        }
+    }
+
+    pub fn or_replace(mut self) -> Self {
+        self.or_replace = true;
+        self
+    }
+
+    pub fn if_not_exists(mut self) -> Self {
+        self.if_not_exists = true;
+        self
+    }
+
+    pub fn option(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.options.insert(key.into(), value.into());
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CreateMaterializedViewStatement {
+    pub name: String,
+    pub query: SelectStatement,
+    pub or_replace: bool,
+    pub if_not_exists: bool,
+    pub to_table: Option<String>,
+    pub options: HashMap<String, String>,
+}
+
+impl CreateMaterializedViewStatement {
+    pub fn new(name: impl Into<String>, query: SelectStatement) -> Self {
+        Self {
+            name: name.into(),
+            query,
+            or_replace: false,
+            if_not_exists: false,
+            to_table: None,
+            options: HashMap::new(),
+        }
+    }
+
+    pub fn or_replace(mut self) -> Self {
+        self.or_replace = true;
+        self
+    }
+
+    pub fn if_not_exists(mut self) -> Self {
+        self.if_not_exists = true;
+        self
+    }
+
+    pub fn to_table(mut self, table: impl Into<String>) -> Self {
+        self.to_table = Some(table.into());
+        self
+    }
+
+    pub fn option(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.options.insert(key.into(), value.into());
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DropViewStatement {
+    pub name: String,
+    pub if_exists: bool,
+    pub materialized: bool,
+}
+
+impl DropViewStatement {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            if_exists: false,
+            materialized: false,
+        }
+    }
+
+    pub fn if_exists(mut self) -> Self {
+        self.if_exists = true;
+        self
+    }
+
+    pub fn materialized(mut self) -> Self {
+        self.materialized = true;
         self
     }
 }

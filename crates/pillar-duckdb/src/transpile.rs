@@ -1,14 +1,15 @@
 use pillar_core::{
     ast::{
         AggregateFunction, AlterTableStatement, BinaryOperator, ColumnDefinition, CountArg,
-        CreateTableStatement, DeleteStatement, DropTableStatement, Expression, InsertStatement,
+        CreateMaterializedViewStatement, CreateTableStatement, CreateViewStatement,
+        DeleteStatement, DropTableStatement, DropViewStatement, Expression, InsertStatement,
         JoinType, NullsOrder, OnConflictAction, OrderDirection, Projection, SelectStatement,
         Statement, UpdateStatement,
     },
     condition::ConditionExpression,
     errors::Error,
     dialect::PreparedStatement,
-    value::Value,
+    value::{ToSql, Value},
 };
 
 
@@ -19,25 +20,25 @@ pub(crate) struct Transpiler {
 
 impl Transpiler {
     pub(crate) fn new() -> Self {
-        Self {
-            params: Vec::new(),
-            count: 0,
-        }
+        Self { params: Vec::new(), count: 0 }
     }
 
-    fn placeholder(&mut self, value: Value) -> String {
+    fn placeholder(&mut self, value: Value, inline: bool) -> String {
+        if inline {
+            return value.to_sql();
+        }
         self.params.push(value);
         self.count += 1;
         format!("${}", self.count)
     }
-    
-    fn select(&mut self, stmt: &SelectStatement) -> Result<String, Error> {
+
+    fn select(&mut self, stmt: &SelectStatement, inline: bool) -> Result<String, Error> {
         let mut sql = format!(
             "{} {} FROM {}",
             if stmt.distinct { "SELECT DISTINCT" } else { "SELECT" },
             stmt.projections
                 .iter()
-                .map(|p| self.projection(p))
+                .map(|p| self.projection(p, inline))
                 .collect::<Vec<_>>()
                 .join(", "),
             match &stmt.from.alias {
@@ -60,12 +61,12 @@ impl Transpiler {
                     Some(alias) => format!("{} AS {}", join.table.name, alias),
                     None => join.table.name.clone(),
                 },
-                self.condition(&join.on),
+                self.condition(&join.on, inline),
             ));
         }
 
         if let Some(where_clause) = &stmt.where_clause {
-            sql.push_str(&format!(" WHERE {}", self.condition(where_clause)));
+            sql.push_str(&format!(" WHERE {}", self.condition(where_clause, inline)));
         }
 
         if !stmt.group_by.is_empty() {
@@ -73,7 +74,7 @@ impl Transpiler {
         }
 
         if let Some(having) = &stmt.having {
-            sql.push_str(&format!(" HAVING {}", self.condition(having)));
+            sql.push_str(&format!(" HAVING {}", self.condition(having, inline)));
         }
 
         if !stmt.order_by.is_empty() {
@@ -135,7 +136,7 @@ impl Transpiler {
                 .map(|row| format!(
                     "({})",
                     row.iter()
-                        .map(|v| self.placeholder(v.clone()))
+                        .map(|v| self.placeholder(v.clone(), false))
                         .collect::<Vec<_>>()
                         .join(", "),
                 ))
@@ -155,13 +156,13 @@ impl Transpiler {
                     sql.push_str(&format!(
                         " ON CONFLICT ({targets}) DO UPDATE SET {}",
                         set.iter()
-                            .map(|(col, val)| format!("{col} = {}", self.placeholder(val.clone())))
+                            .map(|(col, val)| format!("{col} = {}", self.placeholder(val.clone(), false)))
                             .collect::<Vec<_>>()
                             .join(", "),
                     ));
 
                     if let Some(cond) = where_clause {
-                        sql.push_str(&format!(" WHERE {}", self.condition(cond)));
+                        sql.push_str(&format!(" WHERE {}", self.condition(cond, false)));
                     }
                 }
             }
@@ -180,13 +181,13 @@ impl Transpiler {
             stmt.table.name,
             stmt.set
                 .iter()
-                .map(|(col, val)| format!("{col} = {}", self.placeholder(val.clone())))
+                .map(|(col, val)| format!("{col} = {}", self.placeholder(val.clone(), false)))
                 .collect::<Vec<_>>()
                 .join(", "),
         );
 
         if let Some(where_clause) = &stmt.where_clause {
-            sql.push_str(&format!(" WHERE {}", self.condition(where_clause)));
+            sql.push_str(&format!(" WHERE {}", self.condition(where_clause, false)));
         }
 
         Ok(sql)
@@ -196,7 +197,7 @@ impl Transpiler {
         let mut sql = format!("DELETE FROM {}", stmt.table.name);
 
         if let Some(where_clause) = &stmt.where_clause {
-            sql.push_str(&format!(" WHERE {}", self.condition(where_clause)));
+            sql.push_str(&format!(" WHERE {}", self.condition(where_clause, false)));
         }
 
         Ok(sql)
@@ -242,6 +243,35 @@ impl Transpiler {
         ))
     }
 
+    fn create_view(&mut self, stmt: &CreateViewStatement) -> Result<String, Error> {
+        Ok(format!(
+            "CREATE{} VIEW{} {} AS {}",
+            if stmt.or_replace { " OR REPLACE" } else { "" },
+            if stmt.if_not_exists { " IF NOT EXISTS" } else { "" },
+            stmt.name,
+            self.select(&stmt.query, true)?,
+        ))
+    }
+
+    fn create_materialized_view(&mut self, stmt: &CreateMaterializedViewStatement) -> Result<String, Error> {
+        // DuckDB has no materialized views, so we emit a plain view
+        Ok(format!(
+            "CREATE{} VIEW{} {} AS {}",
+            if stmt.or_replace { " OR REPLACE" } else { "" },
+            if stmt.if_not_exists { " IF NOT EXISTS" } else { "" },
+            stmt.name,
+            self.select(&stmt.query, true)?,
+        ))
+    }
+
+    fn drop_view(&mut self, stmt: &DropViewStatement) -> Result<String, Error> {
+        Ok(format!(
+            "DROP VIEW{} {}",
+            if stmt.if_exists { " IF EXISTS" } else { "" },
+            stmt.name,
+        ))
+    }
+
     fn column_definition(&self, col: &ColumnDefinition) -> String {
         format!(
             "{} {}{}{}{}",
@@ -256,7 +286,7 @@ impl Transpiler {
         )
     }
 
-    fn projection(&mut self, proj: &Projection) -> String {
+    fn projection(&mut self, proj: &Projection, inline: bool) -> String {
         match proj {
             Projection::All => "*".to_string(),
 
@@ -279,19 +309,19 @@ impl Transpiler {
                 }
             },
 
-            Projection::Expression(expr) => self.expression(expr),
+            Projection::Expression(expr) => self.expression(expr, inline),
         }
     }
 
-    fn expression(&mut self, expr: &Expression) -> String {
+    fn expression(&mut self, expr: &Expression, inline: bool) -> String {
         match expr {
-            Expression::Value(val) => self.placeholder(val.clone()),
+            Expression::Value(val) => self.placeholder(val.clone(), inline),
 
             Expression::Column(col) => col.clone(),
 
             Expression::BinaryOp { left, op, right } => format!(
                 "({} {} {})",
-                self.expression(left),
+                self.expression(left, inline),
                 match op {
                     BinaryOperator::Add => "+",
                     BinaryOperator::Subtract => "-",
@@ -300,13 +330,13 @@ impl Transpiler {
                     BinaryOperator::Modulo => "%",
                     BinaryOperator::Concat => "||",
                 },
-                self.expression(right),
+                self.expression(right, inline),
             ),
 
             Expression::Function { name, args } => format!(
                 "{name}({})",
                 args.iter()
-                    .map(|a| self.expression(a))
+                    .map(|a| self.expression(a, inline))
                     .collect::<Vec<_>>()
                     .join(", "),
             ),
@@ -315,20 +345,20 @@ impl Transpiler {
                 "CASE{} {} {} END",
                 operand
                     .as_ref()
-                    .map(|e| format!(" {}", self.expression(e)))
+                    .map(|e| format!(" {}", self.expression(e, inline)))
                     .unwrap_or_default(),
                 when_then
                     .iter()
                     .map(|(when, then)| format!(
                         "WHEN {} THEN {}",
-                        self.expression(when),
-                        self.expression(then),
+                        self.expression(when, inline),
+                        self.expression(then, inline),
                     ))
                     .collect::<Vec<_>>()
                     .join(" "),
                 else_result
                     .as_ref()
-                    .map(|e| format!("ELSE {}", self.expression(e)))
+                    .map(|e| format!("ELSE {}", self.expression(e, inline)))
                     .unwrap_or_default(),
             ),
         }
@@ -336,13 +366,16 @@ impl Transpiler {
 
     pub(crate) fn transpile(&mut self, statement: &Statement) -> Result<String, Error> {
         match statement {
-            Statement::Select(s) => self.select(s),
+            Statement::Select(s) => self.select(s, false),
             Statement::Insert(s) => self.insert(s),
             Statement::Update(s) => self.update(s),
             Statement::Delete(s) => self.delete(s),
             Statement::CreateTable(s) => self.create_table(s),
             Statement::AlterTable(s) => self.alter_table(s),
             Statement::DropTable(s) => self.drop_table(s),
+            Statement::CreateView(s) => self.create_view(s),
+            Statement::CreateMaterializedView(s) => self.create_materialized_view(s),
+            Statement::DropView(s) => self.drop_view(s),
             Statement::Raw(sql, params) => {
                 self.params.extend(params.iter().cloned());
                 Ok(sql.clone())
@@ -357,36 +390,36 @@ impl Transpiler {
         }
     }
 
-    pub(crate) fn condition(&mut self, expr: &ConditionExpression) -> String {
+    pub(crate) fn condition(&mut self, expr: &ConditionExpression, inline: bool) -> String {
         match expr {
             ConditionExpression::Eq(col, val) => {
-                format!("{col} = {}", self.placeholder(val.clone()))
+                format!("{col} = {}", self.placeholder(val.clone(), inline))
             }
 
             ConditionExpression::Ne(col, val) => {
-                format!("{col} != {}", self.placeholder(val.clone()))
+                format!("{col} != {}", self.placeholder(val.clone(), inline))
             }
 
             ConditionExpression::Gt(col, val) => {
-                format!("{col} > {}", self.placeholder(val.clone()))
+                format!("{col} > {}", self.placeholder(val.clone(), inline))
             }
 
             ConditionExpression::Gte(col, val) => {
-                format!("{col} >= {}", self.placeholder(val.clone()))
+                format!("{col} >= {}", self.placeholder(val.clone(), inline))
             }
 
             ConditionExpression::Lt(col, val) => {
-                format!("{col} < {}", self.placeholder(val.clone()))
+                format!("{col} < {}", self.placeholder(val.clone(), inline))
             }
 
             ConditionExpression::Lte(col, val) => {
-                format!("{col} <= {}", self.placeholder(val.clone()))
+                format!("{col} <= {}", self.placeholder(val.clone(), inline))
             }
 
             ConditionExpression::In(col, vals) => format!(
                 "{col} IN ({})",
                 vals.iter()
-                    .map(|v| self.placeholder(v.clone()))
+                    .map(|v| self.placeholder(v.clone(), inline))
                     .collect::<Vec<_>>()
                     .join(", "),
             ),
@@ -394,7 +427,7 @@ impl Transpiler {
             ConditionExpression::NotIn(col, vals) => format!(
                 "{col} NOT IN ({})",
                 vals.iter()
-                    .map(|v| self.placeholder(v.clone()))
+                    .map(|v| self.placeholder(v.clone(), inline))
                     .collect::<Vec<_>>()
                     .join(", "),
             ),
@@ -404,34 +437,34 @@ impl Transpiler {
             ConditionExpression::IsNotNull(col) => format!("{col} IS NOT NULL"),
 
             ConditionExpression::Like(col, pattern) => {
-                format!("{col} LIKE {}", self.placeholder(Value::String(pattern.clone())))
+                format!("{col} LIKE {}", self.placeholder(Value::String(pattern.clone()), inline))
             }
 
             ConditionExpression::NotLike(col, pattern) => {
-                format!("{col} NOT LIKE {}", self.placeholder(Value::String(pattern.clone())))
+                format!("{col} NOT LIKE {}", self.placeholder(Value::String(pattern.clone()), inline))
             }
 
             ConditionExpression::Between(col, low, high) => format!(
                 "{col} BETWEEN {} AND {}",
-                self.placeholder(low.clone()),
-                self.placeholder(high.clone()),
+                self.placeholder(low.clone(), inline),
+                self.placeholder(high.clone(), inline),
             ),
 
             ConditionExpression::NotBetween(col, low, high) => format!(
                 "{col} NOT BETWEEN {} AND {}",
-                self.placeholder(low.clone()),
-                self.placeholder(high.clone()),
+                self.placeholder(low.clone(), inline),
+                self.placeholder(high.clone(), inline),
             ),
 
             ConditionExpression::And(left, right) => {
-                format!("({} AND {})", self.condition(left), self.condition(right))
+                format!("({} AND {})", self.condition(left, inline), self.condition(right, inline))
             }
 
             ConditionExpression::Or(left, right) => {
-                format!("({} OR {})", self.condition(left), self.condition(right))
+                format!("({} OR {})", self.condition(left, inline), self.condition(right, inline))
             }
 
-            ConditionExpression::Not(inner) => format!("NOT ({})", self.condition(inner)),
+            ConditionExpression::Not(inner) => format!("NOT ({})", self.condition(inner, inline)),
         }
     }
 }
