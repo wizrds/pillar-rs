@@ -42,6 +42,7 @@ use crate::{
     condition::{Condition, ConditionExpression},
     database::Database,
     model::Model,
+    view::MaterializedView,
     value::Value,
 };
 
@@ -525,46 +526,129 @@ impl<M: Model> Delete<M, Filtered> {
     }
 }
 
-
-/// Entry point for type-safe queries against a model, mirroring sea-orm's entity pattern.
-///
-/// # Example
-/// ```ignore
-/// let users = Entity::<User>::find()
-///     .filter(User::Column::Active.eq(true))
-///     .all(&db)
-///     .await?;
-/// ```
-pub struct Entity<M: Model> {
-    _marker: std::marker::PhantomData<M>,
-}
-
-impl<M: Model> Entity<M> {
-    pub fn find() -> Select<M> {
+pub trait Entity: Model + Sized {
+    fn find() -> Select<Self> {
         Select::new()
     }
 
-    pub fn insert(model: M) -> Result<Insert<M>, Error> {
+    fn insert(model: Self) -> Result<Insert<Self>, Error> {
         Insert::one(model)
     }
 
-    pub fn insert_batch(models: Vec<M>) -> Result<Insert<M>, Error> {
+    fn insert_batch(models: Vec<Self>) -> Result<Insert<Self>, Error> {
         Insert::many(models)
     }
 
-    pub fn update() -> Update<M> {
+    fn update() -> Update<Self> {
         Update::new()
     }
 
-    pub fn delete() -> Delete<M, Unfiltered> {
+    fn delete() -> Delete<Self, Unfiltered> {
         Delete::new()
     }
 
-    pub fn delete_all() -> Delete<M, Filtered> {
+    fn delete_all() -> Delete<Self, Filtered> {
         Delete::all()
     }
 }
 
+impl<M: Model> Entity for M {}
+
+pub struct SelectView<V: MaterializedView> {
+    statement: SelectStatement,
+    _marker: std::marker::PhantomData<V>,
+}
+
+impl<V: MaterializedView> SelectView<V> {
+    pub fn new() -> Self {
+        Self {
+            statement: SelectStatement::new(TableRef::new(V::view_name())),
+            _marker: std::marker::PhantomData,
+        }
+    }
+
+    pub fn columns<I, C>(mut self, columns: I) -> Self
+    where
+        I: IntoIterator<Item = C>,
+        C: IntoColumnRef,
+    {
+        self.statement = self.statement.projections(
+            columns
+                .into_iter()
+                .map(|c| Projection::Column(c.into_column_ref()))
+                .collect(),
+        );
+        self
+    }
+
+    pub fn filter(mut self, condition: impl Into<Condition>) -> Self {
+        if let Some(expr) = condition.into().to_expression() {
+            self.statement = self.statement.where_clause(expr);
+        }
+        self
+    }
+
+    pub fn filter_expr(mut self, expr: ConditionExpression) -> Self {
+        self.statement = self.statement.where_clause(expr);
+        self
+    }
+
+    pub fn order_by_asc<C: IntoColumnRef>(mut self, column: C) -> Self {
+        self.statement = self.statement.order_by_column(OrderBy::asc(column.into_column_ref()));
+        self
+    }
+
+    pub fn order_by_desc<C: IntoColumnRef>(mut self, column: C) -> Self {
+        self.statement = self.statement.order_by_column(OrderBy::desc(column.into_column_ref()));
+        self
+    }
+
+    pub fn limit(mut self, limit: u64) -> Self {
+        self.statement = self.statement.limit(limit);
+        self
+    }
+
+    pub fn offset(mut self, offset: u64) -> Self {
+        self.statement = self.statement.offset(offset);
+        self
+    }
+
+    pub fn into_statement(self) -> Statement {
+        Statement::Select(self.statement)
+    }
+
+    pub async fn all<D: Database>(self, database: &D) -> Result<Vec<V>, Error> {
+        V::from_record_batch(database.query(&self.into_statement()).await?)
+    }
+
+    pub async fn one<D: Database>(self, database: &D) -> Result<Option<V>, Error> {
+        Ok(self.limit(1).all(database).await?.pop())
+    }
+
+    pub async fn stream<D: Database>(
+        self,
+        database: &D,
+    ) -> Result<impl Stream<Item = Result<Vec<V>, Error>>, Error> {
+        Ok(database
+            .query_stream(&self.into_statement())
+            .await?
+            .map(|batch| batch.and_then(|b| V::from_record_batch(b)).map_err(Error::from)))
+    }
+}
+
+impl<V: MaterializedView> Default for SelectView<V> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub trait View: MaterializedView + Sized {
+    fn find() -> SelectView<Self> {
+        SelectView::new()
+    }
+}
+
+impl<V: MaterializedView> View for V {}
 
 #[cfg(test)]
 mod tests {
@@ -617,7 +701,7 @@ mod tests {
 
     #[test]
     fn test_insert_one() {
-        let stmt = Entity::<Event>::insert(Event { id: 1, name: "click".to_string(), count: 42 })
+        let stmt = Event::insert(Event { id: 1, name: "click".to_string(), count: 42 })
             .unwrap()
             .into_statement();
 
@@ -635,7 +719,7 @@ mod tests {
 
     #[test]
     fn test_insert_batch() {
-        let stmt = Entity::<Event>::insert_batch(vec![
+        let stmt = Event::insert_batch(vec![
             Event { id: 1, name: "click".to_string(), count: 10 },
             Event { id: 2, name: "hover".to_string(), count: 20 },
         ])
@@ -653,7 +737,7 @@ mod tests {
 
     #[test]
     fn test_update_set_and_filter() {
-        let stmt = Entity::<Event>::update()
+        let stmt = Event::update()
             .set("count", 99i32)
             .filter_expr(ConditionExpression::eq("id", 1i64))
             .into_statement();
@@ -670,7 +754,7 @@ mod tests {
 
     #[test]
     fn test_delete_with_filter() {
-        let stmt = Entity::<Event>::delete()
+        let stmt = Event::delete()
             .filter_expr(ConditionExpression::eq("id", 7i64))
             .into_statement();
 
@@ -685,7 +769,7 @@ mod tests {
 
     #[test]
     fn test_delete_all() {
-        let stmt = Entity::<Event>::delete_all().into_statement();
+        let stmt = Event::delete_all().into_statement();
 
         let Statement::Delete(delete) = stmt else { panic!("expected Delete") };
 

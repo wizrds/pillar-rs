@@ -25,31 +25,12 @@ impl Transpiler {
         }
     }
 
-    pub(crate) fn finish(self, sql: String) -> PreparedStatement {
-        PreparedStatement {
-            sql,
-            params: self.params,
-        }
-    }
-
     fn placeholder(&mut self, value: Value) -> String {
         self.params.push(value);
         self.count += 1;
         format!("${}", self.count)
     }
-
-    pub(crate) fn transpile(&mut self, statement: &Statement) -> Result<String, Error> {
-        match statement {
-            Statement::Select(s) => self.select(s),
-            Statement::Insert(s) => self.insert(s),
-            Statement::Update(s) => self.update(s),
-            Statement::Delete(s) => self.delete(s),
-            Statement::CreateTable(s) => self.create_table(s),
-            Statement::AlterTable(s) => self.alter_table(s),
-            Statement::DropTable(s) => self.drop_table(s),
-        }
-    }
-
+    
     fn select(&mut self, stmt: &SelectStatement) -> Result<String, Error> {
         let mut sql = format!(
             "{} {} FROM {}",
@@ -275,84 +256,6 @@ impl Transpiler {
         )
     }
 
-    pub(crate) fn condition(&mut self, expr: &ConditionExpression) -> String {
-        match expr {
-            ConditionExpression::Eq(col, val) => {
-                format!("{col} = {}", self.placeholder(val.clone()))
-            }
-
-            ConditionExpression::Ne(col, val) => {
-                format!("{col} != {}", self.placeholder(val.clone()))
-            }
-
-            ConditionExpression::Gt(col, val) => {
-                format!("{col} > {}", self.placeholder(val.clone()))
-            }
-
-            ConditionExpression::Gte(col, val) => {
-                format!("{col} >= {}", self.placeholder(val.clone()))
-            }
-
-            ConditionExpression::Lt(col, val) => {
-                format!("{col} < {}", self.placeholder(val.clone()))
-            }
-
-            ConditionExpression::Lte(col, val) => {
-                format!("{col} <= {}", self.placeholder(val.clone()))
-            }
-
-            ConditionExpression::In(col, vals) => format!(
-                "{col} IN ({})",
-                vals.iter()
-                    .map(|v| self.placeholder(v.clone()))
-                    .collect::<Vec<_>>()
-                    .join(", "),
-            ),
-
-            ConditionExpression::NotIn(col, vals) => format!(
-                "{col} NOT IN ({})",
-                vals.iter()
-                    .map(|v| self.placeholder(v.clone()))
-                    .collect::<Vec<_>>()
-                    .join(", "),
-            ),
-
-            ConditionExpression::IsNull(col) => format!("{col} IS NULL"),
-
-            ConditionExpression::IsNotNull(col) => format!("{col} IS NOT NULL"),
-
-            ConditionExpression::Like(col, pattern) => {
-                format!("{col} LIKE {}", self.placeholder(Value::String(pattern.clone())))
-            }
-
-            ConditionExpression::NotLike(col, pattern) => {
-                format!("{col} NOT LIKE {}", self.placeholder(Value::String(pattern.clone())))
-            }
-
-            ConditionExpression::Between(col, low, high) => format!(
-                "{col} BETWEEN {} AND {}",
-                self.placeholder(low.clone()),
-                self.placeholder(high.clone()),
-            ),
-
-            ConditionExpression::NotBetween(col, low, high) => format!(
-                "{col} NOT BETWEEN {} AND {}",
-                self.placeholder(low.clone()),
-                self.placeholder(high.clone()),
-            ),
-
-            ConditionExpression::And(left, right) => {
-                format!("({} AND {})", self.condition(left), self.condition(right))
-            }
-
-            ConditionExpression::Or(left, right) => {
-                format!("({} OR {})", self.condition(left), self.condition(right))
-            }
-
-            ConditionExpression::Not(inner) => format!("NOT ({})", self.condition(inner)),
-        }
-    }
-
     fn projection(&mut self, proj: &Projection) -> String {
         match proj {
             Projection::All => "*".to_string(),
@@ -428,6 +331,107 @@ impl Transpiler {
                     .map(|e| format!("ELSE {}", self.expression(e)))
                     .unwrap_or_default(),
             ),
+        }
+    }
+
+    pub(crate) fn transpile(&mut self, statement: &Statement) -> Result<String, Error> {
+        match statement {
+            Statement::Select(s) => self.select(s),
+            Statement::Insert(s) => self.insert(s),
+            Statement::Update(s) => self.update(s),
+            Statement::Delete(s) => self.delete(s),
+            Statement::CreateTable(s) => self.create_table(s),
+            Statement::AlterTable(s) => self.alter_table(s),
+            Statement::DropTable(s) => self.drop_table(s),
+            Statement::Raw(sql, params) => {
+                self.params.extend(params.iter().cloned());
+                Ok(sql.clone())
+            }
+        }
+    }
+
+    pub(crate) fn finish(self, sql: String) -> PreparedStatement {
+        PreparedStatement {
+            sql,
+            params: self.params,
+        }
+    }
+
+    pub(crate) fn condition(&mut self, expr: &ConditionExpression) -> String {
+        match expr {
+            ConditionExpression::Eq(col, val) => {
+                format!("{col} = {}", self.placeholder(val.clone()))
+            }
+
+            ConditionExpression::Ne(col, val) => {
+                format!("{col} != {}", self.placeholder(val.clone()))
+            }
+
+            ConditionExpression::Gt(col, val) => {
+                format!("{col} > {}", self.placeholder(val.clone()))
+            }
+
+            ConditionExpression::Gte(col, val) => {
+                format!("{col} >= {}", self.placeholder(val.clone()))
+            }
+
+            ConditionExpression::Lt(col, val) => {
+                format!("{col} < {}", self.placeholder(val.clone()))
+            }
+
+            ConditionExpression::Lte(col, val) => {
+                format!("{col} <= {}", self.placeholder(val.clone()))
+            }
+
+            ConditionExpression::In(col, vals) => format!(
+                "{col} IN ({})",
+                vals.iter()
+                    .map(|v| self.placeholder(v.clone()))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            ),
+
+            ConditionExpression::NotIn(col, vals) => format!(
+                "{col} NOT IN ({})",
+                vals.iter()
+                    .map(|v| self.placeholder(v.clone()))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            ),
+
+            ConditionExpression::IsNull(col) => format!("{col} IS NULL"),
+
+            ConditionExpression::IsNotNull(col) => format!("{col} IS NOT NULL"),
+
+            ConditionExpression::Like(col, pattern) => {
+                format!("{col} LIKE {}", self.placeholder(Value::String(pattern.clone())))
+            }
+
+            ConditionExpression::NotLike(col, pattern) => {
+                format!("{col} NOT LIKE {}", self.placeholder(Value::String(pattern.clone())))
+            }
+
+            ConditionExpression::Between(col, low, high) => format!(
+                "{col} BETWEEN {} AND {}",
+                self.placeholder(low.clone()),
+                self.placeholder(high.clone()),
+            ),
+
+            ConditionExpression::NotBetween(col, low, high) => format!(
+                "{col} NOT BETWEEN {} AND {}",
+                self.placeholder(low.clone()),
+                self.placeholder(high.clone()),
+            ),
+
+            ConditionExpression::And(left, right) => {
+                format!("({} AND {})", self.condition(left), self.condition(right))
+            }
+
+            ConditionExpression::Or(left, right) => {
+                format!("({} OR {})", self.condition(left), self.condition(right))
+            }
+
+            ConditionExpression::Not(inner) => format!("NOT ({})", self.condition(inner)),
         }
     }
 }

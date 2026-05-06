@@ -42,7 +42,8 @@ fn impl_model(attrs: ModelAttrs) -> syn::Result<TokenStream> {
             ) -> ::std::result::Result<::pillar::__private::arrow::record_batch::RecordBatch, ::pillar::errors::Error> {
                 ::pillar::__private::serde_arrow::to_record_batch(
                     &<::std::vec::Vec<::pillar::__private::arrow::datatypes::FieldRef>
-                        as ::pillar::__private::serde_arrow::schema::SchemaLike>::from_type::<Self>(
+                        as ::pillar::__private::serde_arrow::schema::SchemaLike>::from_samples(
+                        &rows.iter().collect::<::std::vec::Vec<_>>(),
                         ::pillar::__private::serde_arrow::schema::TracingOptions::default(),
                     )
                     .map_err(|e| ::pillar::errors::Error::serialization(e.to_string()))?,

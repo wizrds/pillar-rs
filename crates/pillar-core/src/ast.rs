@@ -168,6 +168,7 @@ pub enum Statement {
     CreateTable(CreateTableStatement),
     AlterTable(AlterTableStatement),
     DropTable(DropTableStatement),
+    Raw(String, Vec<Value>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
