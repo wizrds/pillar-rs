@@ -2,9 +2,13 @@ pub use pillar_core::{
     ast::*,
     column::*,
     condition::*,
+    database::*,
+    dialect::*,
     errors::*,
+    migration::*,
+    model::*,
     query::*,
-    traits::*,
     value::*,
+    view::*,
 };
 pub use pillar_macros::*;

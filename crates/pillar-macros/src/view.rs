@@ -21,12 +21,12 @@ fn impl_view(attrs: ViewAttrs) -> syn::Result<TokenStream> {
     let columns_body = columns_body(&attrs.data.take_struct().unwrap().fields)?;
 
     Ok(quote! {
-        impl #impl_generics ::pillar::traits::MaterializedView for #ident #ty_generics #where_clause {
+        impl #impl_generics ::pillar::view::MaterializedView for #ident #ty_generics #where_clause {
             fn view_name() -> &'static str {
                 #view_name
             }
 
-            fn columns() -> &'static [::pillar::traits::ColumnDef] {
+            fn columns() -> &'static [::pillar::column::ColumnDef] {
                 #columns_body
             }
 

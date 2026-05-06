@@ -1,6 +1,43 @@
 use crate::{value::Value, condition::ConditionExpression};
 
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum ColumnType {
+    Boolean,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    UInt8,
+    UInt16,
+    UInt32,
+    UInt64,
+    Float32,
+    Float64,
+    String,
+    Binary,
+    List(Box<ColumnType>),
+    Map(Box<ColumnType>, Box<ColumnType>),
+    #[cfg(feature = "chrono")]
+    Date,
+    #[cfg(feature = "chrono")]
+    Time,
+    #[cfg(feature = "chrono")]
+    DateTime,
+    #[cfg(feature = "uuid")]
+    Uuid,
+}
+
+#[derive(Debug, Clone)]
+pub struct ColumnDef {
+    pub name: &'static str,
+    pub column_type: ColumnType,
+    pub nullable: bool,
+    pub primary_key: bool,
+    pub unique: bool,
+}
+
+
 pub trait IntoColumnRef {
     fn into_column_ref(self) -> String;
 }
@@ -121,12 +158,3 @@ where
         ConditionExpression::not_like(self.into_column_ref(), pattern.into())
     }
 }
-
-
-
-
-
-
-
-
-

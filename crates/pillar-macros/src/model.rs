@@ -21,12 +21,12 @@ fn impl_model(attrs: ModelAttrs) -> syn::Result<TokenStream> {
     let columns_body = columns_body(&attrs.data.take_struct().unwrap().fields)?;
 
     Ok(quote! {
-        impl #impl_generics ::pillar::traits::Model for #ident #ty_generics #where_clause {
+        impl #impl_generics ::pillar::model::Model for #ident #ty_generics #where_clause {
             fn table_name() -> &'static str {
                 #table_name
             }
 
-            fn columns() -> &'static [::pillar::traits::ColumnDef] {
+            fn columns() -> &'static [::pillar::column::ColumnDef] {
                 #columns_body
             }
 

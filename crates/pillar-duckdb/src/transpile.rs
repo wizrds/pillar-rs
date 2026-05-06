@@ -7,7 +7,7 @@ use pillar_core::{
     },
     condition::ConditionExpression,
     errors::Error,
-    traits::PreparedStatement,
+    dialect::PreparedStatement,
     value::Value,
 };
 

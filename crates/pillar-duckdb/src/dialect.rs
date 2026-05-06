@@ -1,7 +1,7 @@
 use pillar_core::{
     ast::Statement,
     errors::Error,
-    traits::{Dialect, Feature, PreparedStatement},
+    dialect::{Dialect, Feature, PreparedStatement},
 };
 
 use crate::transpile::Transpiler;

@@ -6,8 +6,12 @@ pub mod ast;
 pub mod value;
 pub mod condition;
 pub mod column;
+pub mod dialect;
+pub mod model;
+pub mod view;
+pub mod database;
 pub mod query;
-pub mod traits;
+pub mod migration;
 
 #[doc(hidden)]
 pub mod __private {

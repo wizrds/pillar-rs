@@ -1,23 +1,26 @@
-use arrow::array::{
-    Array,
-    BinaryArray, LargeBinaryArray,
-    BooleanArray,
-    Float32Array, Float64Array,
-    Int8Array, Int16Array, Int32Array, Int64Array,
-    StringArray, LargeStringArray,
-    UInt8Array, UInt16Array, UInt32Array, UInt64Array,
+use futures::stream::{Stream, StreamExt};
+use arrow::{
+    array::{
+        Array,
+        BinaryArray, LargeBinaryArray,
+        BooleanArray,
+        Float32Array, Float64Array,
+        Int8Array, Int16Array, Int32Array, Int64Array,
+        StringArray, LargeStringArray,
+        UInt8Array, UInt16Array, UInt32Array, UInt64Array,
+    },
+    datatypes::DataType,
+    record_batch::RecordBatch,
 };
 #[cfg(feature = "chrono")]
 use arrow::array::{Date32Array, Time64NanosecondArray, TimestampNanosecondArray};
-#[cfg(feature = "uuid")]
-use arrow::array::FixedSizeBinaryArray;
-use arrow::datatypes::DataType;
 #[cfg(feature = "chrono")]
 use arrow::datatypes::TimeUnit;
-use arrow::record_batch::RecordBatch;
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
-use futures::stream::{Stream, StreamExt};
+#[cfg(feature = "uuid")]
+use arrow::array::FixedSizeBinaryArray;
+
 
 use crate::{
     errors::Error,
@@ -37,7 +40,8 @@ use crate::{
     },
     column::IntoColumnRef,
     condition::{Condition, ConditionExpression},
-    traits::{Database, Model},
+    database::Database,
+    model::Model,
     value::Value,
 };
 
@@ -571,7 +575,7 @@ mod tests {
     use crate::{
         ast::Statement,
         condition::ConditionExpression,
-        traits::{ColumnDef, ColumnType},
+        column::{ColumnDef, ColumnType},
         value::Value,
     };
 

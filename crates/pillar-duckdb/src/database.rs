@@ -5,7 +5,8 @@ use arrow::{compute::concat_batches, record_batch::RecordBatch};
 use pillar_core::{
     ast::Statement,
     errors::Error,
-    traits::{Database, Dialect, ExecutionResult},
+    database::{Database, ExecutionResult},
+    dialect::Dialect,
 };
 
 use crate::{dialect::DuckDbDialect, value::DuckDbValue};

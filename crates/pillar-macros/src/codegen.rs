@@ -22,7 +22,7 @@ pub fn columns_body(fields: &[FieldAttrs]) -> syn::Result<TokenStream> {
     let count = defs.len();
 
     Ok(quote! {
-        static COLUMNS: [::pillar::traits::ColumnDef; #count] = [#(#defs),*];
+        static COLUMNS: [::pillar::column::ColumnDef; #count] = [#(#defs),*];
         &COLUMNS
     })
 }
@@ -39,7 +39,7 @@ fn column_def_tokens(field: &FieldAttrs) -> syn::Result<TokenStream> {
     let unique = field.unique;
 
     Ok(quote! {
-        ::pillar::traits::ColumnDef {
+        ::pillar::column::ColumnDef {
             name: #name,
             column_type: #column_type,
             nullable: #nullable,
