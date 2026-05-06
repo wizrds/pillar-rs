@@ -21,13 +21,11 @@ use chrono::TimeZone;
 #[cfg(feature = "uuid")]
 use arrow::array::FixedSizeBinaryArray;
 
-
 use crate::{
     errors::Error,
     ast::{
         DeleteStatement,
         InsertStatement,
-        CreateMaterializedViewStatement,
         Join,
         JoinType,
         OrderBy,
@@ -43,17 +41,16 @@ use crate::{
     condition::{Condition, ConditionExpression},
     database::Database,
     model::Model,
-    view::{MaterializedView, ViewQuery},
     value::Value,
 };
 
 
-pub struct Select<M: Model> {
+pub struct SelectEntity<M: Model> {
     statement: SelectStatement,
     _marker: std::marker::PhantomData<M>,
 }
 
-impl<M: Model> Select<M> {
+impl<M: Model> SelectEntity<M> {
     pub fn new() -> Self {
         Self {
             statement: SelectStatement::new(TableRef::new(M::table_name())),
@@ -256,19 +253,19 @@ impl<M: Model> Select<M> {
     }
 }
 
-impl<M: Model> Default for Select<M> {
+impl<M: Model> Default for SelectEntity<M> {
     fn default() -> Self {
         Self::new()
     }
 }
 
 
-pub struct Insert<M: Model> {
+pub struct InsertEntity<M: Model> {
     statement: InsertStatement,
     _marker: std::marker::PhantomData<M>,
 }
 
-impl<M: Model> Insert<M> {
+impl<M: Model> InsertEntity<M> {
     pub fn many(models: Vec<M>) -> Result<Self, Error> {
         if models.is_empty() {
             return Err(Error::invalid_query("Cannot insert empty batch"))
@@ -411,12 +408,12 @@ impl<M: Model> Insert<M> {
 }
 
 
-pub struct Update<M: Model> {
+pub struct UpdateEntity<M: Model> {
     statement: UpdateStatement,
     _marker: std::marker::PhantomData<M>,
 }
 
-impl<M: Model> Update<M> {
+impl<M: Model> UpdateEntity<M> {
     pub fn new() -> Self {
         Self {
             statement: UpdateStatement::new(TableRef::new(M::table_name())),
@@ -458,7 +455,7 @@ impl<M: Model> Update<M> {
     }
 }
 
-impl<M: Model> Default for Update<M> {
+impl<M: Model> Default for UpdateEntity<M> {
     fn default() -> Self {
         Self::new()
     }
@@ -468,12 +465,12 @@ impl<M: Model> Default for Update<M> {
 pub struct Filtered;
 pub struct Unfiltered;
 
-pub struct Delete<M: Model, S = Unfiltered> {
+pub struct DeleteEntity<M: Model, S = Unfiltered> {
     statement: DeleteStatement,
     _marker: std::marker::PhantomData<(M, S)>,
 }
 
-impl<M: Model> Delete<M, Unfiltered> {
+impl<M: Model> DeleteEntity<M, Unfiltered> {
     pub fn new() -> Self {
         Self {
             statement: DeleteStatement::new(TableRef::new(M::table_name())),
@@ -481,15 +478,15 @@ impl<M: Model> Delete<M, Unfiltered> {
         }
     }
 
-    pub fn all() -> Delete<M, Filtered> {
-        Delete {
+    pub fn all() -> DeleteEntity<M, Filtered> {
+        DeleteEntity {
             statement: DeleteStatement::new(TableRef::new(M::table_name())),
             _marker: std::marker::PhantomData,
         }
     }
 
-    pub fn filter(self, condition: impl Into<Condition>) -> Delete<M, Filtered> {
-        Delete {
+    pub fn filter(self, condition: impl Into<Condition>) -> DeleteEntity<M, Filtered> {
+        DeleteEntity {
             statement: match condition.into().to_expression() {
                 Some(expr) => self.statement.where_clause(expr),
                 None => self.statement,
@@ -498,21 +495,21 @@ impl<M: Model> Delete<M, Unfiltered> {
         }
     }
 
-    pub fn filter_expr(self, expr: ConditionExpression) -> Delete<M, Filtered> {
-        Delete {
+    pub fn filter_expr(self, expr: ConditionExpression) -> DeleteEntity<M, Filtered> {
+        DeleteEntity {
             statement: self.statement.where_clause(expr),
             _marker: std::marker::PhantomData,
         }
     }
 }
 
-impl<M: Model> Default for Delete<M, Unfiltered> {
+impl<M: Model> Default for DeleteEntity<M, Unfiltered> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<M: Model> Delete<M, Filtered> {
+impl<M: Model> DeleteEntity<M, Filtered> {
     pub fn into_statement(self) -> Statement {
         Statement::Delete(self.statement)
     }
@@ -527,264 +524,30 @@ impl<M: Model> Delete<M, Filtered> {
     }
 }
 
-pub trait Entity: Model + Sized {
-    fn find() -> Select<Self> {
-        Select::new()
+pub trait EntityOps: Model + Sized {
+    fn find() -> SelectEntity<Self> {
+        SelectEntity::new()
     }
 
-    fn insert(model: Self) -> Result<Insert<Self>, Error> {
-        Insert::one(model)
+    fn insert(model: Self) -> Result<InsertEntity<Self>, Error> {
+        InsertEntity::one(model)
     }
 
-    fn insert_batch(models: Vec<Self>) -> Result<Insert<Self>, Error> {
-        Insert::many(models)
+    fn insert_batch(models: Vec<Self>) -> Result<InsertEntity<Self>, Error> {
+        InsertEntity::many(models)
     }
 
-    fn update() -> Update<Self> {
-        Update::new()
+    fn update() -> UpdateEntity<Self> {
+        UpdateEntity::new()
     }
 
-    fn delete() -> Delete<Self, Unfiltered> {
-        Delete::new()
+    fn delete() -> DeleteEntity<Self, Unfiltered> {
+        DeleteEntity::new()
     }
 
-    fn delete_all() -> Delete<Self, Filtered> {
-        Delete::all()
-    }
-}
-
-impl<M: Model> Entity for M {}
-
-pub struct SelectView<V: MaterializedView> {
-    statement: SelectStatement,
-    _marker: std::marker::PhantomData<V>,
-}
-
-impl<V: MaterializedView> SelectView<V> {
-    pub fn new() -> Self {
-        Self {
-            statement: SelectStatement::new(TableRef::new(V::view_name())),
-            _marker: std::marker::PhantomData,
-        }
-    }
-
-    pub fn columns<I, C>(mut self, columns: I) -> Self
-    where
-        I: IntoIterator<Item = C>,
-        C: IntoColumnRef,
-    {
-        self.statement = self.statement.projections(
-            columns
-                .into_iter()
-                .map(|c| Projection::Column(c.into_column_ref()))
-                .collect(),
-        );
-        self
-    }
-
-    pub fn filter(mut self, condition: impl Into<Condition>) -> Self {
-        if let Some(expr) = condition.into().to_expression() {
-            self.statement = self.statement.where_clause(expr);
-        }
-        self
-    }
-
-    pub fn filter_expr(mut self, expr: ConditionExpression) -> Self {
-        self.statement = self.statement.where_clause(expr);
-        self
-    }
-
-    pub fn order_by_asc<C: IntoColumnRef>(mut self, column: C) -> Self {
-        self.statement = self.statement.order_by_column(OrderBy::asc(column.into_column_ref()));
-        self
-    }
-
-    pub fn order_by_desc<C: IntoColumnRef>(mut self, column: C) -> Self {
-        self.statement = self.statement.order_by_column(OrderBy::desc(column.into_column_ref()));
-        self
-    }
-
-    pub fn limit(mut self, limit: u64) -> Self {
-        self.statement = self.statement.limit(limit);
-        self
-    }
-
-    pub fn offset(mut self, offset: u64) -> Self {
-        self.statement = self.statement.offset(offset);
-        self
-    }
-
-    pub fn into_statement(self) -> Statement {
-        Statement::Select(self.statement)
-    }
-
-    pub async fn all<D: Database>(self, database: &D) -> Result<Vec<V>, Error> {
-        V::from_record_batch(database.query(&self.into_statement()).await?)
-    }
-
-    pub async fn one<D: Database>(self, database: &D) -> Result<Option<V>, Error> {
-        Ok(self.limit(1).all(database).await?.pop())
-    }
-
-    pub async fn stream<D: Database>(
-        self,
-        database: &D,
-    ) -> Result<impl Stream<Item = Result<Vec<V>, Error>>, Error> {
-        Ok(database
-            .query_stream(&self.into_statement())
-            .await?
-            .map(|batch| batch.and_then(|b| V::from_record_batch(b)).map_err(Error::from)))
+    fn delete_all() -> DeleteEntity<Self, Filtered> {
+        DeleteEntity::all()
     }
 }
 
-impl<V: MaterializedView> Default for SelectView<V> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-pub trait View: MaterializedView + Sized {
-    fn find() -> SelectView<Self> {
-        SelectView::new()
-    }
-}
-
-pub trait DefinedView: ViewQuery + Sized {
-    fn create_statement() -> Statement {
-        Statement::CreateMaterializedView(
-            CreateMaterializedViewStatement::new(Self::view_name(), Self::query()),
-        )
-    }
-}
-
-impl<V: ViewQuery> DefinedView for V {}
-
-impl<V: MaterializedView> View for V {}
-
-#[cfg(test)]
-mod tests {
-    use arrow::datatypes::FieldRef;
-    use serde_arrow::schema::{SchemaLike, TracingOptions};
-
-    use super::*;
-    use crate::{
-        ast::Statement,
-        condition::ConditionExpression,
-        column::{ColumnDef, ColumnType},
-        value::Value,
-    };
-
-    #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-    struct Event {
-        id: i64,
-        name: String,
-        count: i32,
-    }
-
-    impl Model for Event {
-        fn table_name() -> &'static str {
-            "events"
-        }
-
-        fn columns() -> &'static [ColumnDef] {
-            static COLUMNS: [ColumnDef; 3] = [
-                ColumnDef { name: "id",    column_type: ColumnType::Int64,  nullable: false, primary_key: true,  unique: true  },
-                ColumnDef { name: "name",  column_type: ColumnType::String, nullable: false, primary_key: false, unique: false },
-                ColumnDef { name: "count", column_type: ColumnType::Int32,  nullable: false, primary_key: false, unique: false },
-            ];
-            &COLUMNS
-        }
-
-        fn from_record_batch(batch: RecordBatch) -> Result<Vec<Self>, Error> {
-            serde_arrow::from_record_batch(&batch)
-                .map_err(|e| Error::serialization(e.to_string()))
-        }
-
-        fn to_record_batch(rows: &[Self]) -> Result<RecordBatch, Error> {
-            serde_arrow::to_record_batch(
-                &Vec::<FieldRef>::from_type::<Self>(TracingOptions::default())
-                    .map_err(|e| Error::serialization(e.to_string()))?,
-                &rows.to_vec(),
-            )
-            .map_err(|e| Error::serialization(e.to_string()))
-        }
-    }
-
-    #[test]
-    fn test_insert_one() {
-        let stmt = Event::insert(Event { id: 1, name: "click".to_string(), count: 42 })
-            .unwrap()
-            .into_statement();
-
-        let Statement::Insert(insert) = stmt else { panic!("expected Insert") };
-
-        assert_eq!(insert.table.name, "events");
-        assert_eq!(insert.columns, vec!["id", "name", "count"]);
-        assert_eq!(insert.values.len(), 1);
-        assert_eq!(insert.values[0], vec![
-            Value::Int64(1),
-            Value::String("click".to_string()),
-            Value::Int32(42),
-        ]);
-    }
-
-    #[test]
-    fn test_insert_batch() {
-        let stmt = Event::insert_batch(vec![
-            Event { id: 1, name: "click".to_string(), count: 10 },
-            Event { id: 2, name: "hover".to_string(), count: 20 },
-        ])
-        .unwrap()
-        .into_statement();
-
-        let Statement::Insert(insert) = stmt else { panic!("expected Insert") };
-
-        assert_eq!(insert.values.len(), 2);
-        assert_eq!(insert.values[0][0], Value::Int64(1));
-        assert_eq!(insert.values[1][0], Value::Int64(2));
-        assert_eq!(insert.values[0][1], Value::String("click".to_string()));
-        assert_eq!(insert.values[1][1], Value::String("hover".to_string()));
-    }
-
-    #[test]
-    fn test_update_set_and_filter() {
-        let stmt = Event::update()
-            .set("count", 99i32)
-            .filter_expr(ConditionExpression::eq("id", 1i64))
-            .into_statement();
-
-        let Statement::Update(update) = stmt else { panic!("expected Update") };
-
-        assert_eq!(update.table.name, "events");
-        assert_eq!(update.set, vec![("count".to_string(), Value::Int32(99))]);
-        assert_eq!(update.where_clause, Some(ConditionExpression::Eq(
-            "id".to_string(),
-            Value::Int64(1),
-        )));
-    }
-
-    #[test]
-    fn test_delete_with_filter() {
-        let stmt = Event::delete()
-            .filter_expr(ConditionExpression::eq("id", 7i64))
-            .into_statement();
-
-        let Statement::Delete(delete) = stmt else { panic!("expected Delete") };
-
-        assert_eq!(delete.table.name, "events");
-        assert_eq!(delete.where_clause, Some(ConditionExpression::Eq(
-            "id".to_string(),
-            Value::Int64(7),
-        )));
-    }
-
-    #[test]
-    fn test_delete_all() {
-        let stmt = Event::delete_all().into_statement();
-
-        let Statement::Delete(delete) = stmt else { panic!("expected Delete") };
-
-        assert_eq!(delete.table.name, "events");
-        assert!(delete.where_clause.is_none());
-    }
-}
+impl<M: Model> EntityOps for M {}
