@@ -12,6 +12,7 @@ members = [
     "crates/pillar-macros",
     "crates/pillar-core",
     "crates/pillar-duckdb",
+    "crates/pillar-clickhouse",
     "crates/pillar",
 ]
 exclude = [

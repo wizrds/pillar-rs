@@ -1,0 +1,29 @@
+[package]
+name = "pillar-clickhouse"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+repository.workspace = true
+license.workspace = true
+readme.workspace = true
+
+[dependencies]
+pillar-core = { path = "../pillar-core", version = "0.0.0" }
+
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+arrow = { workspace = true }
+futures = { workspace = true }
+
+clickhouse = { version = "0.15", features = ["futures03"] }
+
+chrono = { workspace = true, optional = true }
+
+[features]
+default = []
+chrono = ["pillar-core/chrono", "dep:chrono"]
+uuid = ["pillar-core/uuid"]

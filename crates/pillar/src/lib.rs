@@ -13,3 +13,8 @@ pub use pillar_core::*;
 pub mod duckdb {
     pub use pillar_duckdb::*;
 }
+
+#[cfg(feature = "clickhouse")]
+pub mod clickhouse {
+    pub use pillar_clickhouse::*;
+}
