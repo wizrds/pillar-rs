@@ -26,6 +26,47 @@ pub enum ColumnType {
     DateTime,
     #[cfg(feature = "uuid")]
     Uuid,
+
+    /// High-precision timestamp with sub-second digits (0–9).
+    DateTime64 { precision: u8 },
+
+    /// String optimized for low-cardinality data (enums, status codes, hostnames).
+    LowCardinalityString,
+
+    /// Fixed-length string of exactly n bytes.
+    FixedString(u32),
+
+    /// Stores intermediate aggregate state for incremental rollup tables.
+    AggregateState(AggregateStateFunction),
+
+    /// Explicit nullable wrapper for backends that require it in the type position.
+    Nullable(Box<ColumnType>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AggregateStateFunction {
+    pub function: AggregateFn,
+    pub arg_types: Vec<ColumnType>,
+}
+
+impl AggregateStateFunction {
+    pub fn new(function: AggregateFn, arg_types: Vec<ColumnType>) -> Self {
+        Self { function, arg_types }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum AggregateFn {
+    Count,
+    Sum,
+    Avg,
+    Min,
+    Max,
+    Uniq,
+    Quantile(f64),
+    TopK(u32),
+    Histogram(u32),
+    Custom(String),
 }
 
 #[derive(Debug, Clone)]

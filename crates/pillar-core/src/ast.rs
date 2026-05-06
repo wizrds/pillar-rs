@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use crate::{condition::ConditionExpression, value::Value};
+use crate::{column::ColumnType, condition::ConditionExpression, value::Value};
 
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ColumnDefinition {
     pub name: String,
-    pub data_type: String,
+    pub data_type: ColumnType,
     pub nullable: bool,
     pub primary_key: bool,
     pub default: Option<Value>,
@@ -49,6 +49,12 @@ pub enum AggregateFunction {
     Min(String),
     Max(String),
     ApproxCountDistinct(String),
+    Uniq(String),
+    Quantile { level: f64, column: String },
+    TopK { k: u32, column: String },
+    Histogram { bins: u32, column: String },
+    State(Box<AggregateFunction>),
+    Merge(Box<AggregateFunction>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -76,6 +82,7 @@ pub enum Expression {
         when_then: Vec<(Expression, Expression)>,
         else_result: Option<Box<Expression>>,
     },
+    Aggregate(AggregateFunction),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -159,6 +166,47 @@ pub enum OnConflictAction {
         set: Vec<(String, Value)>,
         where_clause: Option<ConditionExpression>,
     },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TtlClause {
+    pub column: String,
+    pub interval: Interval,
+    pub action: TtlAction,
+}
+
+impl TtlClause {
+    pub fn delete(column: impl Into<String>, interval: Interval) -> Self {
+        Self { column: column.into(), interval, action: TtlAction::Delete }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Interval {
+    pub value: u32,
+    pub unit: IntervalUnit,
+}
+
+impl Interval {
+    pub fn new(value: u32, unit: IntervalUnit) -> Self {
+        Self { value, unit }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum IntervalUnit {
+    Second,
+    Minute,
+    Hour,
+    Day,
+    Week,
+    Month,
+    Year,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TtlAction {
+    Delete,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -349,6 +397,7 @@ pub struct CreateTableStatement {
     pub columns: Vec<ColumnDefinition>,
     pub if_not_exists: bool,
     pub options: HashMap<String, String>,
+    pub ttl: Option<TtlClause>,
 }
 
 impl CreateTableStatement {
@@ -358,6 +407,7 @@ impl CreateTableStatement {
             columns: Vec::new(),
             if_not_exists: false,
             options: HashMap::new(),
+            ttl: None,
         }
     }
 
@@ -375,6 +425,11 @@ impl CreateTableStatement {
         self.options.insert(key.into(), value.into());
         self
     }
+
+    pub fn ttl(mut self, ttl: TtlClause) -> Self {
+        self.ttl = Some(ttl);
+        self
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -382,6 +437,7 @@ pub struct AlterTableStatement {
     pub name: String,
     pub add_columns: Vec<ColumnDefinition>,
     pub drop_columns: Vec<String>,
+    pub ttl: Option<TtlClause>,
 }
 
 impl AlterTableStatement {
@@ -390,6 +446,7 @@ impl AlterTableStatement {
             name: name.into(),
             add_columns: Vec::new(),
             drop_columns: Vec::new(),
+            ttl: None,
         }
     }
 
@@ -400,6 +457,11 @@ impl AlterTableStatement {
 
     pub fn drop_columns(mut self, columns: Vec<String>) -> Self {
         self.drop_columns = columns;
+        self
+    }
+
+    pub fn ttl(mut self, ttl: TtlClause) -> Self {
+        self.ttl = Some(ttl);
         self
     }
 }

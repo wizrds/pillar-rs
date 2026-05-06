@@ -6,6 +6,7 @@ use pillar_core::{
         JoinType, NullsOrder, OnConflictAction, OrderDirection, Projection, SelectStatement,
         Statement, UpdateStatement,
     },
+    column::{AggregateFn, ColumnType},
     condition::ConditionExpression,
     errors::Error,
     dialect::PreparedStatement,
@@ -228,8 +229,12 @@ impl Transpiler {
             )
             .collect::<Vec<_>>();
 
-        if parts.is_empty() {
+        if parts.is_empty() && stmt.ttl.is_none() {
             return Err(Error::invalid_query("ALTER TABLE statement has no operations"));
+        }
+
+        if parts.is_empty() {
+            return Ok(String::new());
         }
 
         Ok(format!("ALTER TABLE {} {}", stmt.name, parts.join(", ")))
@@ -272,11 +277,64 @@ impl Transpiler {
         ))
     }
 
+    fn column_type(&self, col_type: &ColumnType) -> String {
+        match col_type {
+            ColumnType::Boolean => "BOOLEAN".to_string(),
+            ColumnType::Int8 => "TINYINT".to_string(),
+            ColumnType::Int16 => "SMALLINT".to_string(),
+            ColumnType::Int32 => "INTEGER".to_string(),
+            ColumnType::Int64 => "BIGINT".to_string(),
+            ColumnType::UInt8 => "UTINYINT".to_string(),
+            ColumnType::UInt16 => "USMALLINT".to_string(),
+            ColumnType::UInt32 => "UINTEGER".to_string(),
+            ColumnType::UInt64 => "UBIGINT".to_string(),
+            ColumnType::Float32 => "FLOAT".to_string(),
+            ColumnType::Float64 => "DOUBLE".to_string(),
+            ColumnType::String => "VARCHAR".to_string(),
+            ColumnType::Binary => "BLOB".to_string(),
+            ColumnType::List(inner) => format!("{}[]", self.column_type(inner)),
+            ColumnType::Map(k, v) => format!("MAP({}, {})", self.column_type(k), self.column_type(v)),
+            #[cfg(feature = "chrono")]
+            ColumnType::Date => "DATE".to_string(),
+            #[cfg(feature = "chrono")]
+            ColumnType::Time => "TIME".to_string(),
+            #[cfg(feature = "chrono")]
+            ColumnType::DateTime => "TIMESTAMP WITH TIME ZONE".to_string(),
+            #[cfg(feature = "uuid")]
+            ColumnType::Uuid => "UUID".to_string(),
+            ColumnType::DateTime64 { .. } => "TIMESTAMP".to_string(),
+            ColumnType::LowCardinalityString => "VARCHAR".to_string(),
+            ColumnType::FixedString(n) => format!("CHAR({n})"),
+            ColumnType::AggregateState(state) => {
+                // DuckDB has no aggregate state storage; use the result type of the function
+                match &state.function {
+                    AggregateFn::Count => "UBIGINT".to_string(),
+                    AggregateFn::Sum | AggregateFn::Avg => state.arg_types.first()
+                        .map(|t| self.column_type(t))
+                        .unwrap_or_else(|| "DOUBLE".to_string()),
+                    AggregateFn::Min | AggregateFn::Max => state.arg_types.first()
+                        .map(|t| self.column_type(t))
+                        .unwrap_or_else(|| "DOUBLE".to_string()),
+                    AggregateFn::Uniq => "UBIGINT".to_string(),
+                    AggregateFn::Quantile(_) => state.arg_types.first()
+                        .map(|t| self.column_type(t))
+                        .unwrap_or_else(|| "DOUBLE".to_string()),
+                    AggregateFn::TopK(_) => state.arg_types.first()
+                        .map(|t| format!("{}[]", self.column_type(t)))
+                        .unwrap_or_else(|| "VARCHAR[]".to_string()),
+                    AggregateFn::Histogram(_) => "DOUBLE[]".to_string(),
+                    AggregateFn::Custom(_) => "VARCHAR".to_string(),
+                }
+            }
+            ColumnType::Nullable(inner) => self.column_type(inner),
+        }
+    }
+
     fn column_definition(&self, col: &ColumnDefinition) -> String {
         format!(
             "{} {}{}{}{}",
             col.name,
-            col.data_type,
+            self.column_type(&col.data_type),
             if col.nullable { "" } else { " NOT NULL" },
             if col.primary_key { " PRIMARY KEY" } else { "" },
             match &col.default {
@@ -294,20 +352,7 @@ impl Transpiler {
 
             Projection::ColumnAlias(col, alias) => format!("{col} AS {alias}"),
 
-            Projection::Aggregate(agg) => match agg {
-                AggregateFunction::Count(CountArg::All) => "COUNT(*)".to_string(),
-                AggregateFunction::Count(CountArg::Column(col)) => format!("COUNT({col})"),
-                AggregateFunction::Count(CountArg::Distinct(col)) => {
-                    format!("COUNT(DISTINCT {col})")
-                }
-                AggregateFunction::Sum(col) => format!("SUM({col})"),
-                AggregateFunction::Avg(col) => format!("AVG({col})"),
-                AggregateFunction::Min(col) => format!("MIN({col})"),
-                AggregateFunction::Max(col) => format!("MAX({col})"),
-                AggregateFunction::ApproxCountDistinct(col) => {
-                    format!("APPROX_COUNT_DISTINCT({col})")
-                }
-            },
+            Projection::Aggregate(agg) => self.aggregate(agg),
 
             Projection::Expression(expr) => self.expression(expr, inline),
         }
@@ -361,6 +406,30 @@ impl Transpiler {
                     .map(|e| format!("ELSE {}", self.expression(e, inline)))
                     .unwrap_or_default(),
             ),
+
+            Expression::Aggregate(agg) => self.aggregate(agg),
+        }
+    }
+
+    fn aggregate(&self, agg: &AggregateFunction) -> String {
+        match agg {
+            AggregateFunction::Count(CountArg::All) => "COUNT(*)".to_string(),
+            AggregateFunction::Count(CountArg::Column(col)) => format!("COUNT({col})"),
+            AggregateFunction::Count(CountArg::Distinct(col)) => format!("COUNT(DISTINCT {col})"),
+            AggregateFunction::Sum(col) => format!("SUM({col})"),
+            AggregateFunction::Avg(col) => format!("AVG({col})"),
+            AggregateFunction::Min(col) => format!("MIN({col})"),
+            AggregateFunction::Max(col) => format!("MAX({col})"),
+            AggregateFunction::ApproxCountDistinct(col) => format!("APPROX_COUNT_DISTINCT({col})"),
+            AggregateFunction::Uniq(col) => format!("APPROX_COUNT_DISTINCT({col})"),
+            AggregateFunction::Quantile { level, column } => {
+                format!("PERCENTILE_CONT({level}) WITHIN GROUP (ORDER BY {column})")
+            }
+            AggregateFunction::TopK { k, column } => format!("APPROX_TOP_K({column}, {k})"),
+            AggregateFunction::Histogram { bins: _, column } => format!("histogram({column})"),
+            // State/Merge have no equivalent in DuckDB; emit the plain function
+            AggregateFunction::State(inner) => self.aggregate(inner),
+            AggregateFunction::Merge(inner) => self.aggregate(inner),
         }
     }
 
@@ -474,8 +543,11 @@ impl Transpiler {
 mod tests {
     use pillar_core::{
         ast::{
-            DeleteStatement, InsertStatement, SelectStatement, Statement, TableRef, UpdateStatement,
+            AggregateFunction, AlterTableStatement, ColumnDefinition, CountArg,
+            CreateTableStatement, DeleteStatement, InsertStatement, Interval, IntervalUnit,
+            Projection, SelectStatement, Statement, TableRef, TtlClause, UpdateStatement,
         },
+        column::{AggregateFn, AggregateStateFunction, ColumnType},
         condition::ConditionExpression,
         value::Value,
     };
@@ -619,5 +691,82 @@ mod tests {
         ));
 
         assert!(result.is_err());
+    }
+
+    fn col(name: &str, data_type: ColumnType) -> ColumnDefinition {
+        ColumnDefinition { name: name.into(), data_type, nullable: false, primary_key: false, default: None }
+    }
+
+    #[test]
+    fn test_column_types_map_correctly() {
+        let (sql, params) = transpile(Statement::CreateTable(
+            CreateTableStatement::new("events")
+                .columns(vec![
+                    col("id", ColumnType::UInt64),
+                    col("name", ColumnType::LowCardinalityString),
+                    col("event_time", ColumnType::DateTime64 { precision: 3 }),
+                    col("tag", ColumnType::FixedString(16)),
+                ]),
+        ));
+        assert_eq!(sql, "CREATE TABLE events (id UBIGINT NOT NULL, name VARCHAR NOT NULL, event_time TIMESTAMP NOT NULL, tag CHAR(16) NOT NULL)");
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn test_aggregate_state_column_maps_to_result_type() {
+        let (sql, params) = transpile(Statement::CreateTable(
+            CreateTableStatement::new("events_by_minute")
+                .columns(vec![
+                    col("count", ColumnType::AggregateState(AggregateStateFunction::new(AggregateFn::Count, vec![ColumnType::UInt64]))),
+                    col("duration_avg", ColumnType::AggregateState(AggregateStateFunction::new(AggregateFn::Avg, vec![ColumnType::Float64]))),
+                    col("duration_p95", ColumnType::AggregateState(AggregateStateFunction::new(AggregateFn::Quantile(0.95), vec![ColumnType::Float64]))),
+                ]),
+        ));
+        assert_eq!(sql, "CREATE TABLE events_by_minute (count UBIGINT NOT NULL, duration_avg DOUBLE NOT NULL, duration_p95 DOUBLE NOT NULL)");
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn test_ttl_is_ignored() {
+        let (sql, params) = transpile(Statement::CreateTable(
+            CreateTableStatement::new("events")
+                .columns(vec![col("event_time", ColumnType::DateTime64 { precision: 3 })])
+                .ttl(TtlClause::delete("event_time", Interval::new(90, IntervalUnit::Day))),
+        ));
+        assert_eq!(sql, "CREATE TABLE events (event_time TIMESTAMP NOT NULL)");
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn test_alter_table_ttl_only_is_noop() {
+        let (sql, params) = transpile(Statement::AlterTable(
+            AlterTableStatement::new("events")
+                .ttl(TtlClause::delete("event_time", Interval::new(30, IntervalUnit::Day))),
+        ));
+        assert_eq!(sql, "");
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn test_state_merge_emit_plain_function() {
+        let (sql, params) = transpile(Statement::Select(
+            SelectStatement::new(TableRef::new("events"))
+                .projections(vec![
+                    Projection::Aggregate(AggregateFunction::State(Box::new(AggregateFunction::Count(CountArg::All)))),
+                    Projection::Aggregate(AggregateFunction::Merge(Box::new(AggregateFunction::Avg("duration_ms".into())))),
+                ]),
+        ));
+        assert_eq!(sql, "SELECT COUNT(*), AVG(duration_ms) FROM events");
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn test_quantile_maps_to_percentile_cont() {
+        let (sql, params) = transpile(Statement::Select(
+            SelectStatement::new(TableRef::new("events"))
+                .projections(vec![Projection::Aggregate(AggregateFunction::Quantile { level: 0.95, column: "duration_ms".into() })]),
+        ));
+        assert_eq!(sql, "SELECT PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY duration_ms) FROM events");
+        assert!(params.is_empty());
     }
 }
