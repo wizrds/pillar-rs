@@ -60,6 +60,7 @@ fn column_def(field: &FieldAttrs) -> syn::Result<TokenStream> {
             nullable: #nullable,
             primary_key: #primary_key,
             unique: #unique,
+            default: None,
         }
     })
 }

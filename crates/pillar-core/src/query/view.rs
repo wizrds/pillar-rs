@@ -144,4 +144,3 @@ pub trait ViewSchema: ViewQuery + Sized {
     }
 }
 
-impl<V: ViewQuery> ViewSchema for V {}

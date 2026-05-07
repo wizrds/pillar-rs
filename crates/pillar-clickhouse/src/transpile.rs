@@ -386,6 +386,9 @@ impl Transpiler {
             Projection::ColumnAlias(col, alias) => format!("{col} AS {alias}"),
             Projection::Aggregate(agg) => self.aggregate(agg),
             Projection::Expression(expr) => self.expression(expr, inline),
+            Projection::Aliased(inner, alias) => {
+                format!("{} AS {alias}", self.projection(inner, inline))
+            }
         }
     }
 

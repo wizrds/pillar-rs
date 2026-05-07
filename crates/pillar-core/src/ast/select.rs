@@ -18,6 +18,8 @@ pub enum Projection {
     Aggregate(AggregateFunction),
     /// Selects an arbitrary expression.
     Expression(Expression),
+    /// Wraps any projection with an output alias.
+    Aliased(Box<Projection>, String),
 }
 
 /// An aggregate function used in a [`Projection`](crate::ast::Projection) or [`Expression`](crate::ast::Expression).

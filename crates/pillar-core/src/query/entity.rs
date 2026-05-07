@@ -631,6 +631,4 @@ pub trait TableSchema: Model {
     }
 }
 
-impl<M: Model> TableSchema for M {}
-
 

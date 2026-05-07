@@ -69,7 +69,7 @@ impl Transpiler {
             sql.push_str(&format!(" WHERE {}", self.condition(where_clause, inline)));
         }
 
-        if !stmt.group_by.is_empty() {
+        if !stmt.group_by.is_empty() && !self.has_merge_projections(&stmt.projections) {
             sql.push_str(&format!(" GROUP BY {}", stmt.group_by.join(", ")));
         }
 
@@ -347,14 +347,13 @@ impl Transpiler {
     fn projection(&mut self, proj: &Projection, inline: bool) -> String {
         match proj {
             Projection::All => "*".to_string(),
-
             Projection::Column(col) => col.clone(),
-
             Projection::ColumnAlias(col, alias) => format!("{col} AS {alias}"),
-
             Projection::Aggregate(agg) => self.aggregate(agg),
-
             Projection::Expression(expr) => self.expression(expr, inline),
+            Projection::Aliased(inner, alias) => {
+                format!("{} AS {alias}", self.projection(inner, inline))
+            }
         }
     }
 
@@ -427,10 +426,39 @@ impl Transpiler {
             }
             AggregateFunction::TopK { k, column } => format!("APPROX_TOP_K({column}, {k})"),
             AggregateFunction::Histogram { bins: _, column } => format!("histogram({column})"),
-            // State/Merge have no equivalent in DuckDB; emit the plain function
+            // State writes plain aggregates; Merge reads the stored value directly
             AggregateFunction::State(inner) => self.aggregate(inner),
-            AggregateFunction::Merge(inner) => self.aggregate(inner),
+            AggregateFunction::Merge(inner) => self.merge_column(inner),
         }
+    }
+
+    fn merge_column(&self, inner: &AggregateFunction) -> String {
+        match inner {
+            AggregateFunction::Count(CountArg::Column(col)) => col.clone(),
+            AggregateFunction::Count(CountArg::Distinct(col)) => col.clone(),
+            AggregateFunction::Sum(col) => col.clone(),
+            AggregateFunction::Avg(col) => col.clone(),
+            AggregateFunction::Min(col) => col.clone(),
+            AggregateFunction::Max(col) => col.clone(),
+            AggregateFunction::Uniq(col) => col.clone(),
+            AggregateFunction::ApproxCountDistinct(col) => col.clone(),
+            AggregateFunction::Quantile { column, .. } => column.clone(),
+            AggregateFunction::TopK { column, .. } => column.clone(),
+            AggregateFunction::Histogram { column, .. } => column.clone(),
+            // Fallback: emit the plain aggregate
+            _ => self.aggregate(inner),
+        }
+    }
+
+    fn has_merge_projections(&self, projections: &[Projection]) -> bool {
+        projections.iter().any(|p| match p {
+            Projection::Aggregate(AggregateFunction::Merge(_)) => true,
+            Projection::Aliased(inner, _) => matches!(
+                inner.as_ref(),
+                Projection::Aggregate(AggregateFunction::Merge(_))
+            ),
+            _ => false,
+        })
     }
 
     pub fn transpile(&mut self, statement: &Statement) -> Result<String, Error> {

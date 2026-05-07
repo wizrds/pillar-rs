@@ -84,6 +84,16 @@ fn model_struct(table_name: &str, fields: &[FieldAttrs]) -> syn::Result<TokenStr
 }
 
 fn table_schema_impl(table_name: &str, fields: &[FieldAttrs], attrs: &ModelAttrs) -> syn::Result<TokenStream> {
+    let has_ddl = attrs.engine.is_some()
+        || attrs.partition_by.is_some()
+        || attrs.ttl.is_some()
+        || attrs.options.as_ref().map(|o| !o.is_empty()).unwrap_or(false)
+        || fields.iter().any(|f| f.order_by);
+
+    if !has_ddl {
+        return Ok(quote! {});
+    }
+
     let col_defs = fields.iter()
         .filter(|f| !f.skip)
         .map(|f| {

@@ -165,7 +165,9 @@ fn view_schema_impl(fields: &[FieldAttrs], attrs: &ViewAttrs) -> syn::Result<Tok
         || attrs.options.as_ref().map(|o| !o.is_empty()).unwrap_or(false);
 
     if !has_overrides {
-        return Ok(quote! {});
+        return Ok(quote! {
+            impl ::pillar::query::ViewSchema for View {}
+        });
     }
 
     let order_by_fields: Vec<String> = fields.iter()
