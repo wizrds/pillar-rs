@@ -258,12 +258,23 @@ impl Transpiler {
     }
 
     fn create_materialized_view(&mut self, stmt: &CreateMaterializedViewStatement) -> Result<String, Error> {
-        // DuckDB has no materialized views, so we emit a plain view
+        // When a TO target is specified, the target table becomes the view on DuckDB.
+        // We drop the pre-created table and replace it with a view of the same name,
+        // so downstream reads from the target name work on both backends.
+        let (view_name, preamble) = match &stmt.to_table {
+            Some(target) => (
+                target.as_str(),
+                format!("DROP TABLE IF EXISTS {target}; "),
+            ),
+            None => (stmt.name.as_str(), String::new()),
+        };
+
         Ok(format!(
-            "CREATE{} VIEW{} {} AS {}",
+            "{}CREATE{} VIEW{} {} AS {}",
+            preamble,
             if stmt.or_replace { " OR REPLACE" } else { "" },
             if stmt.if_not_exists { " IF NOT EXISTS" } else { "" },
-            stmt.name,
+            view_name,
             self.select(&stmt.query, true)?,
         ))
     }
@@ -412,10 +423,10 @@ impl Transpiler {
 
     fn aggregate(&self, agg: &AggregateFunction) -> String {
         match agg {
-            AggregateFunction::Count(CountArg::All) => "COUNT(*)".to_string(),
-            AggregateFunction::Count(CountArg::Column(col)) => format!("COUNT({col})"),
-            AggregateFunction::Count(CountArg::Distinct(col)) => format!("COUNT(DISTINCT {col})"),
-            AggregateFunction::Sum(col) => format!("SUM({col})"),
+            AggregateFunction::Count(CountArg::All) => "CAST(COUNT(*) AS UBIGINT)".to_string(),
+            AggregateFunction::Count(CountArg::Column(col)) => format!("CAST(COUNT({col}) AS UBIGINT)"),
+            AggregateFunction::Count(CountArg::Distinct(col)) => format!("CAST(COUNT(DISTINCT {col}) AS UBIGINT)"),
+            AggregateFunction::Sum(col) => format!("CAST(SUM({col}) AS UBIGINT)"),
             AggregateFunction::Avg(col) => format!("AVG({col})"),
             AggregateFunction::Min(col) => format!("MIN({col})"),
             AggregateFunction::Max(col) => format!("MAX({col})"),

@@ -9,13 +9,14 @@ use pillar_core::{
     dialect::Dialect,
 };
 
-use crate::{dialect::DuckDbDialect, value::DuckDbValue};
+use crate::{dialect::DuckDbDialect, normalize::BatchNormalizer, value::DuckDbValue};
 
 
 /// A [`pillar_core::database::Database`](pillar_core::database::Database) implementation backed by DuckDB.
 pub struct DuckDbDatabase {
     conn: Arc<Mutex<duckdb::Connection>>,
     dialect: DuckDbDialect,
+    normalizer: BatchNormalizer,
 }
 
 impl DuckDbDatabase {
@@ -24,6 +25,7 @@ impl DuckDbDatabase {
         Self {
             conn: Arc::new(Mutex::new(conn)),
             dialect: DuckDbDialect,
+            normalizer: BatchNormalizer::new(),
         }
     }
 
@@ -59,18 +61,22 @@ impl Database for DuckDbDatabase {
         let conn = Arc::clone(&self.conn);
 
         blocking::unblock(move || {
-            conn.lock()
-                .map_err(|e| Error::connection(e.to_string()))?
-                .execute(
-                    &prepared.sql,
-                    duckdb::params_from_iter(
-                        prepared.params
-                            .iter()
-                            .map(DuckDbValue::from)
-                    ),
-                )
-                .map(|rows_affected| ExecutionResult { rows_affected, metadata: None })
-                .map_err(|e| Error::connection(e.to_string()))
+            let guard = conn.lock().map_err(|e| Error::connection(e.to_string()))?;
+
+            if prepared.params.is_empty() {
+                guard
+                    .execute_batch(&prepared.sql)
+                    .map(|_| ExecutionResult { rows_affected: 0, metadata: None })
+                    .map_err(|e| Error::connection(e.to_string()))
+            } else {
+                guard
+                    .execute(
+                        &prepared.sql,
+                        duckdb::params_from_iter(prepared.params.iter().map(DuckDbValue::from)),
+                    )
+                    .map(|rows_affected| ExecutionResult { rows_affected, metadata: None })
+                    .map_err(|e| Error::connection(e.to_string()))
+            }
         })
         .await
     }
@@ -100,6 +106,7 @@ impl Database for DuckDbDatabase {
                 .map_err(|e| Error::unexpected(e.to_string()))
         })
         .await
+        .and_then(|batch| self.normalizer.normalize(batch))
     }
 
     async fn query_stream(
@@ -129,7 +136,7 @@ impl Database for DuckDbDatabase {
             })
             .await?
             .into_iter()
-            .map(Ok)
+            .map(|batch| self.normalizer.normalize(batch))
         )))
     }
 }

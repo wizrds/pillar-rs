@@ -5,6 +5,7 @@ extern crate self as pillar_duckdb;
 
 mod database;
 mod dialect;
+mod normalize;
 mod transpile;
 mod value;
 
