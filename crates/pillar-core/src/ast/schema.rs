@@ -7,12 +7,11 @@ use arrow::datatypes::{DataType, Field};
 use arrow::datatypes::TimeUnit;
 
 use crate::{
-    column::IntoColumnRef,
     errors::Error,
     value::Value,
     ast::{
+        refs::{ColumnRef, TableRef},
         select::SelectStatement,
-        table::TableRef,
         ttl::TtlClause,
     },
 };
@@ -344,7 +343,7 @@ impl CreateTableStatement {
 pub struct AlterTableStatement {
     pub name: String,
     pub add_columns: Vec<ColumnDefinition>,
-    pub drop_columns: Vec<String>,
+    pub drop_columns: Vec<ColumnRef>,
     pub ttl: Option<TtlClause>,
 }
 
@@ -367,14 +366,14 @@ impl AlterTableStatement {
     }
 
     /// Sets the column names to drop.
-    pub fn drop_columns(mut self, columns: impl IntoIterator<Item = impl IntoColumnRef>) -> Self {
-        self.drop_columns = columns.into_iter().map(IntoColumnRef::into_column_ref).collect();
+    pub fn drop_columns(mut self, columns: impl IntoIterator<Item = impl Into<ColumnRef>>) -> Self {
+        self.drop_columns = columns.into_iter().map(Into::into).collect();
         self
     }
 
     /// Drops a single column by name.
-    pub fn drop_column(mut self, column: impl IntoColumnRef) -> Self {
-        self.drop_columns.push(column.into_column_ref());
+    pub fn drop_column(mut self, column: impl Into<ColumnRef>) -> Self {
+        self.drop_columns.push(column.into());
         self
     }
 

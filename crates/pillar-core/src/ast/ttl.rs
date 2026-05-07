@@ -1,10 +1,10 @@
-use crate::column::IntoColumnRef;
+use crate::ast::refs::ColumnRef;
 
 /// Defines a TTL (time-to-live) rule on a table, specifying when rows expire.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TtlClause {
     /// The column whose value is used to calculate row expiry.
-    pub column: String,
+    pub column: ColumnRef,
     /// How long after the column value a row is retained.
     pub interval: Interval,
     /// What to do when a row expires.
@@ -13,8 +13,8 @@ pub struct TtlClause {
 
 impl TtlClause {
     /// Creates a [`TtlClause`](crate::ast::TtlClause) that deletes rows after the given interval.
-    pub fn delete(column: impl IntoColumnRef, interval: Interval) -> Self {
-        Self { column: column.into_column_ref(), interval, action: TtlAction::Delete }
+    pub fn delete(column: impl Into<ColumnRef>, interval: Interval) -> Self {
+        Self { column: column.into(), interval, action: TtlAction::Delete }
     }
 }
 

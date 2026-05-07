@@ -5,7 +5,7 @@ use crate::{
     errors::Error,
     value::Value,
     condition::ConditionExpression,
-    ast::schema::{ColumnDefinition, ColumnType},
+    ast::{refs::ColumnRef, schema::{ColumnDefinition, ColumnType}},
 };
 
 
@@ -36,36 +36,13 @@ impl ColumnDef {
 impl From<&ColumnDef> for ColumnDefinition {
     fn from(col: &ColumnDef) -> Self {
         Self {
-            name: col.name.to_string(),
+            name: col.name.into(),
             data_type: col.column_type.clone(),
             nullable: col.nullable,
             primary_key: col.primary_key,
             unique: col.unique,
             default: col.default.clone(),
         }
-    }
-}
-
-/// Converts a value into a column name string for use in a query.
-pub trait IntoColumnRef {
-    fn into_column_ref(self) -> String;
-}
-
-impl IntoColumnRef for String {
-    fn into_column_ref(self) -> String {
-        self
-    }
-}
-
-impl IntoColumnRef for &String {
-    fn into_column_ref(self) -> String {
-        self.clone()
-    }
-}
-
-impl IntoColumnRef for &str {
-    fn into_column_ref(self) -> String {
-        self.to_string()
     }
 }
 
@@ -99,9 +76,9 @@ impl<T> TypedColumn<T> {
     }
 }
 
-impl<T> IntoColumnRef for TypedColumn<T> {
-    fn into_column_ref(self) -> String {
-        self.name.to_string()
+impl<T> From<TypedColumn<T>> for ColumnRef {
+    fn from(col: TypedColumn<T>) -> Self {
+        ColumnRef::new(col.name)
     }
 }
 
@@ -111,32 +88,32 @@ where
 {
     /// Column equals value.
     pub fn eq<V: Into<Value>>(self, value: V) -> ConditionExpression {
-        ConditionExpression::eq(self.into_column_ref(), value.into())
+        ConditionExpression::eq(self, value.into())
     }
 
     /// Column does not equal value.
     pub fn ne<V: Into<Value>>(self, value: V) -> ConditionExpression {
-        ConditionExpression::ne(self.into_column_ref(), value.into())
+        ConditionExpression::ne(self, value.into())
     }
 
     /// Column is greater than value.
     pub fn gt<V: Into<Value>>(self, value: V) -> ConditionExpression {
-        ConditionExpression::gt(self.into_column_ref(), value.into())
+        ConditionExpression::gt(self, value.into())
     }
 
     /// Column is greater than or equal to value.
     pub fn gte<V: Into<Value>>(self, value: V) -> ConditionExpression {
-        ConditionExpression::gte(self.into_column_ref(), value.into())
+        ConditionExpression::gte(self, value.into())
     }
 
     /// Column is less than value.
     pub fn lt<V: Into<Value>>(self, value: V) -> ConditionExpression {
-        ConditionExpression::lt(self.into_column_ref(), value.into())
+        ConditionExpression::lt(self, value.into())
     }
 
     /// Column is less than or equal to value.
     pub fn lte<V: Into<Value>>(self, value: V) -> ConditionExpression {
-        ConditionExpression::lte(self.into_column_ref(), value.into())
+        ConditionExpression::lte(self, value.into())
     }
 
     /// Column value is in the given list.
@@ -145,7 +122,7 @@ where
         I: IntoIterator<Item = V>,
         V: Into<Value>,
     {
-        ConditionExpression::in_list(self.into_column_ref(), values.into_iter().map(Into::into).collect())
+        ConditionExpression::in_list(self, values.into_iter().map(Into::into).collect())
     }
 
     /// Column value is not in the given list.
@@ -154,27 +131,27 @@ where
         I: IntoIterator<Item = V>,
         V: Into<Value>,
     {
-        ConditionExpression::is_not_in(self.into_column_ref(), values.into_iter().map(Into::into).collect())
+        ConditionExpression::is_not_in(self, values.into_iter().map(Into::into).collect())
     }
 
     /// Column is NULL.
     pub fn is_null(self) -> ConditionExpression {
-        ConditionExpression::is_null(self.into_column_ref())
+        ConditionExpression::is_null(self)
     }
 
     /// Column is not NULL.
     pub fn is_not_null(self) -> ConditionExpression {
-        ConditionExpression::is_not_null(self.into_column_ref())
+        ConditionExpression::is_not_null(self)
     }
 
     /// Column value is between `low` and `high` (inclusive).
     pub fn between<V: Into<Value>>(self, low: V, high: V) -> ConditionExpression {
-        ConditionExpression::between(self.into_column_ref(), low.into(), high.into())
+        ConditionExpression::between(self, low.into(), high.into())
     }
 
     /// Column value is not between `low` and `high`.
     pub fn not_between<V: Into<Value>>(self, low: V, high: V) -> ConditionExpression {
-        ConditionExpression::not_between(self.into_column_ref(), low.into(), high.into())
+        ConditionExpression::not_between(self, low.into(), high.into())
     }
 }
 
@@ -184,11 +161,11 @@ where
 {
     /// Column value matches the given SQL LIKE pattern.
     pub fn like(self, pattern: impl Into<String>) -> ConditionExpression {
-        ConditionExpression::like(self.into_column_ref(), pattern.into())
+        ConditionExpression::like(self, pattern.into())
     }
 
     /// Column value does not match the given SQL LIKE pattern.
     pub fn not_like(self, pattern: impl Into<String>) -> ConditionExpression {
-        ConditionExpression::not_like(self.into_column_ref(), pattern.into())
+        ConditionExpression::not_like(self, pattern.into())
     }
 }

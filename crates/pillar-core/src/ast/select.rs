@@ -1,8 +1,7 @@
 use crate::{
-    column::IntoColumnRef,
     condition::ConditionExpression,
     value::Value,
-    ast::table::TableRef,
+    ast::refs::{ColumnRef, TableRef},
 };
 
 
@@ -12,9 +11,9 @@ pub enum Projection {
     /// Selects all columns (`*`).
     All,
     /// Selects a single named column.
-    Column(String),
+    Column(ColumnRef),
     /// Selects a column with an alias.
-    ColumnAlias(String, String),
+    ColumnAlias(ColumnRef, String),
     /// Selects an aggregate expression.
     Aggregate(AggregateFunction),
     /// Selects an arbitrary expression.
@@ -30,13 +29,13 @@ impl Projection {
     }
 
     /// Selects a single named column.
-    pub fn column(col: impl IntoColumnRef) -> Self {
-        Self::Column(col.into_column_ref())
+    pub fn column(col: impl Into<ColumnRef>) -> Self {
+        Self::Column(col.into())
     }
 
     /// Selects a column with an output alias.
-    pub fn column_alias(col: impl IntoColumnRef, alias: impl Into<String>) -> Self {
-        Self::ColumnAlias(col.into_column_ref(), alias.into())
+    pub fn column_alias(col: impl Into<ColumnRef>, alias: impl Into<String>) -> Self {
+        Self::ColumnAlias(col.into(), alias.into())
     }
 
     /// Selects an aggregate function.
@@ -66,23 +65,23 @@ pub enum AggregateFunction {
     /// `COUNT(*)`, `COUNT(column)`, or `COUNT(DISTINCT column)`.
     Count(CountArg),
     /// `SUM(column)`.
-    Sum(String),
+    Sum(ColumnRef),
     /// `AVG(column)`.
-    Avg(String),
+    Avg(ColumnRef),
     /// `MIN(column)`.
-    Min(String),
+    Min(ColumnRef),
     /// `MAX(column)`.
-    Max(String),
+    Max(ColumnRef),
     /// `approxCountDistinct(column)` or equivalent.
-    ApproxCountDistinct(String),
+    ApproxCountDistinct(ColumnRef),
     /// `uniq(column)` or equivalent.
-    Uniq(String),
+    Uniq(ColumnRef),
     /// `QUANTILE(level)(column)` or equivalent.
-    Quantile { level: f64, column: String },
+    Quantile { level: f64, column: ColumnRef },
     /// `topK(k)(column)` or equivalent.
-    TopK { k: u32, column: String },
+    TopK { k: u32, column: ColumnRef },
     /// `histogram(bins)(column)` or equivalent.
-    Histogram { bins: u32, column: String },
+    Histogram { bins: u32, column: ColumnRef },
     /// Wraps a function to produce its intermediate state (e.g. `countState`).
     State(Box<AggregateFunction>),
     /// Merges intermediate aggregate states (e.g. `countMerge`).
@@ -96,58 +95,58 @@ impl AggregateFunction {
     }
 
     /// `COUNT(column)`.
-    pub fn count(col: impl IntoColumnRef) -> Self {
-        Self::Count(CountArg::Column(col.into_column_ref()))
+    pub fn count(col: impl Into<ColumnRef>) -> Self {
+        Self::Count(CountArg::Column(col.into()))
     }
 
     /// `COUNT(DISTINCT column)`.
-    pub fn count_distinct(col: impl IntoColumnRef) -> Self {
-        Self::Count(CountArg::Distinct(col.into_column_ref()))
+    pub fn count_distinct(col: impl Into<ColumnRef>) -> Self {
+        Self::Count(CountArg::Distinct(col.into()))
     }
 
     /// `SUM(column)`.
-    pub fn sum(col: impl IntoColumnRef) -> Self {
-        Self::Sum(col.into_column_ref())
+    pub fn sum(col: impl Into<ColumnRef>) -> Self {
+        Self::Sum(col.into())
     }
 
     /// `AVG(column)`.
-    pub fn avg(col: impl IntoColumnRef) -> Self {
-        Self::Avg(col.into_column_ref())
+    pub fn avg(col: impl Into<ColumnRef>) -> Self {
+        Self::Avg(col.into())
     }
 
     /// `MIN(column)`.
-    pub fn min(col: impl IntoColumnRef) -> Self {
-        Self::Min(col.into_column_ref())
+    pub fn min(col: impl Into<ColumnRef>) -> Self {
+        Self::Min(col.into())
     }
 
     /// `MAX(column)`.
-    pub fn max(col: impl IntoColumnRef) -> Self {
-        Self::Max(col.into_column_ref())
+    pub fn max(col: impl Into<ColumnRef>) -> Self {
+        Self::Max(col.into())
     }
 
     /// `approxCountDistinct(column)` or equivalent.
-    pub fn approx_count_distinct(col: impl IntoColumnRef) -> Self {
-        Self::ApproxCountDistinct(col.into_column_ref())
+    pub fn approx_count_distinct(col: impl Into<ColumnRef>) -> Self {
+        Self::ApproxCountDistinct(col.into())
     }
 
     /// `uniq(column)` or equivalent.
-    pub fn uniq(col: impl IntoColumnRef) -> Self {
-        Self::Uniq(col.into_column_ref())
+    pub fn uniq(col: impl Into<ColumnRef>) -> Self {
+        Self::Uniq(col.into())
     }
 
     /// `QUANTILE(level)(column)` or equivalent.
-    pub fn quantile(level: f64, col: impl IntoColumnRef) -> Self {
-        Self::Quantile { level, column: col.into_column_ref() }
+    pub fn quantile(level: f64, col: impl Into<ColumnRef>) -> Self {
+        Self::Quantile { level, column: col.into() }
     }
 
     /// `topK(k)(column)` or equivalent.
-    pub fn top_k(k: u32, col: impl IntoColumnRef) -> Self {
-        Self::TopK { k, column: col.into_column_ref() }
+    pub fn top_k(k: u32, col: impl Into<ColumnRef>) -> Self {
+        Self::TopK { k, column: col.into() }
     }
 
     /// `histogram(bins)(column)` or equivalent.
-    pub fn histogram(bins: u32, col: impl IntoColumnRef) -> Self {
-        Self::Histogram { bins, column: col.into_column_ref() }
+    pub fn histogram(bins: u32, col: impl Into<ColumnRef>) -> Self {
+        Self::Histogram { bins, column: col.into() }
     }
 
     /// Wraps this function to produce its intermediate aggregate state.
@@ -167,9 +166,9 @@ pub enum CountArg {
     /// `COUNT(*)`.
     All,
     /// `COUNT(column)`.
-    Column(String),
+    Column(ColumnRef),
     /// `COUNT(DISTINCT column)`.
-    Distinct(String),
+    Distinct(ColumnRef),
 }
 
 impl CountArg {
@@ -179,13 +178,13 @@ impl CountArg {
     }
 
     /// `COUNT(column)`.
-    pub fn column(col: impl IntoColumnRef) -> Self {
-        Self::Column(col.into_column_ref())
+    pub fn column(col: impl Into<ColumnRef>) -> Self {
+        Self::Column(col.into())
     }
 
     /// `COUNT(DISTINCT column)`.
-    pub fn distinct(col: impl IntoColumnRef) -> Self {
-        Self::Distinct(col.into_column_ref())
+    pub fn distinct(col: impl Into<ColumnRef>) -> Self {
+        Self::Distinct(col.into())
     }
 }
 
@@ -195,7 +194,7 @@ pub enum Expression {
     /// A literal value.
     Value(Value),
     /// A column reference.
-    Column(String),
+    Column(ColumnRef),
     /// A binary arithmetic or string operation.
     BinaryOp {
         left: Box<Expression>,
@@ -224,8 +223,8 @@ impl Expression {
     }
 
     /// A column reference.
-    pub fn column(col: impl IntoColumnRef) -> Self {
-        Self::Column(col.into_column_ref())
+    pub fn column(col: impl Into<ColumnRef>) -> Self {
+        Self::Column(col.into())
     }
 
     /// A scalar function call.
@@ -434,20 +433,20 @@ pub enum JoinType {
 /// A single column ordering directive in a [`SelectStatement`](crate::ast::SelectStatement).
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrderBy {
-    pub column: String,
+    pub column: ColumnRef,
     pub direction: OrderDirection,
     pub nulls: Option<NullsOrder>,
 }
 
 impl OrderBy {
     /// Orders by the given column ascending.
-    pub fn asc(column: impl IntoColumnRef) -> Self {
-        Self { column: column.into_column_ref(), direction: OrderDirection::Asc, nulls: None }
+    pub fn asc(column: impl Into<ColumnRef>) -> Self {
+        Self { column: column.into(), direction: OrderDirection::Asc, nulls: None }
     }
 
     /// Orders by the given column descending.
-    pub fn desc(column: impl IntoColumnRef) -> Self {
-        Self { column: column.into_column_ref(), direction: OrderDirection::Desc, nulls: None }
+    pub fn desc(column: impl Into<ColumnRef>) -> Self {
+        Self { column: column.into(), direction: OrderDirection::Desc, nulls: None }
     }
 
     /// Sets the NULL ordering for this directive.
@@ -483,7 +482,7 @@ pub struct SelectStatement {
     pub from: TableRef,
     pub joins: Vec<Join>,
     pub where_clause: Option<ConditionExpression>,
-    pub group_by: Vec<String>,
+    pub group_by: Vec<ColumnRef>,
     pub having: Option<ConditionExpression>,
     pub order_by: Vec<OrderBy>,
     pub limit: Option<u64>,
@@ -532,8 +531,8 @@ impl SelectStatement {
     }
 
     /// Sets the GROUP BY column list.
-    pub fn group_by(mut self, columns: impl IntoIterator<Item = impl IntoColumnRef>) -> Self {
-        self.group_by = columns.into_iter().map(IntoColumnRef::into_column_ref).collect();
+    pub fn group_by(mut self, columns: impl IntoIterator<Item = impl Into<ColumnRef>>) -> Self {
+        self.group_by = columns.into_iter().map(Into::into).collect();
         self
     }
 

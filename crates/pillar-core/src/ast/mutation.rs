@@ -1,15 +1,14 @@
 use crate::{
-    column::IntoColumnRef,
     condition::ConditionExpression,
     value::Value,
-    ast::table::TableRef,
+    ast::refs::{ColumnRef, TableRef},
 };
 
 
 /// Specifies which columns to target and what to do on a conflict in an [`InsertStatement`](crate::ast::InsertStatement).
 #[derive(Debug, Clone, PartialEq)]
 pub struct OnConflict {
-    pub target: Vec<String>,
+    pub target: Vec<ColumnRef>,
     pub action: OnConflictAction,
 }
 
@@ -20,8 +19,8 @@ impl OnConflict {
     }
 
     /// Sets the conflict target columns.
-    pub fn target(mut self, columns: impl IntoIterator<Item = impl IntoColumnRef>) -> Self {
-        self.target = columns.into_iter().map(IntoColumnRef::into_column_ref).collect();
+    pub fn target(mut self, columns: impl IntoIterator<Item = impl Into<ColumnRef>>) -> Self {
+        self.target = columns.into_iter().map(Into::into).collect();
         self
     }
 }
@@ -31,7 +30,7 @@ impl OnConflict {
 pub enum OnConflictAction {
     DoNothing,
     DoUpdate {
-        set: Vec<(String, Value)>,
+        set: Vec<(ColumnRef, Value)>,
         where_clause: Option<ConditionExpression>,
     },
 }
@@ -46,11 +45,11 @@ impl OnConflictAction {
     pub fn do_update<I, K, V>(set: I) -> Self
     where
         I: IntoIterator<Item = (K, V)>,
-        K: IntoColumnRef,
+        K: Into<ColumnRef>,
         V: Into<Value>,
     {
         Self::DoUpdate {
-            set: set.into_iter().map(|(k, v)| (k.into_column_ref(), v.into())).collect(),
+            set: set.into_iter().map(|(k, v)| (k.into(), v.into())).collect(),
             where_clause: None,
         }
     }
@@ -68,7 +67,7 @@ impl OnConflictAction {
 #[derive(Debug, Clone, PartialEq)]
 pub struct InsertStatement {
     pub table: TableRef,
-    pub columns: Vec<String>,
+    pub columns: Vec<ColumnRef>,
     pub values: Vec<Vec<Value>>,
     pub on_conflict: Option<OnConflict>,
 }
@@ -80,8 +79,8 @@ impl InsertStatement {
     }
 
     /// Sets the column names for the insert.
-    pub fn columns(mut self, columns: impl IntoIterator<Item = impl IntoColumnRef>) -> Self {
-        self.columns = columns.into_iter().map(IntoColumnRef::into_column_ref).collect();
+    pub fn columns(mut self, columns: impl IntoIterator<Item = impl Into<ColumnRef>>) -> Self {
+        self.columns = columns.into_iter().map(Into::into).collect();
         self
     }
 
@@ -110,7 +109,7 @@ impl InsertStatement {
 #[derive(Debug, Clone, PartialEq)]
 pub struct UpdateStatement {
     pub table: TableRef,
-    pub set: Vec<(String, Value)>,
+    pub set: Vec<(ColumnRef, Value)>,
     pub where_clause: Option<ConditionExpression>,
 }
 
@@ -124,10 +123,10 @@ impl UpdateStatement {
     pub fn set<I, K, V>(mut self, set: I) -> Self
     where
         I: IntoIterator<Item = (K, V)>,
-        K: IntoColumnRef,
+        K: Into<ColumnRef>,
         V: Into<Value>,
     {
-        self.set = set.into_iter().map(|(k, v)| (k.into_column_ref(), v.into())).collect();
+        self.set = set.into_iter().map(|(k, v)| (k.into(), v.into())).collect();
         self
     }
 

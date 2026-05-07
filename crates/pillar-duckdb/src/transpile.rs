@@ -74,7 +74,10 @@ impl Transpiler {
         }
 
         if !stmt.group_by.is_empty() && !self.has_merge_projections(&stmt.projections) {
-            sql.push_str(&format!(" GROUP BY {}", stmt.group_by.join(", ")));
+            sql.push_str(&format!(
+                " GROUP BY {}",
+                stmt.group_by.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", "),
+            ));
         }
 
         if let Some(having) = &stmt.having {
@@ -88,7 +91,7 @@ impl Transpiler {
                     .iter()
                     .map(|o| format!(
                         "{} {}{}",
-                        o.column,
+                        o.column.name,
                         match o.direction {
                             OrderDirection::Asc => "ASC",
                             OrderDirection::Desc => "DESC",
@@ -134,7 +137,7 @@ impl Transpiler {
         let mut sql = format!(
             "INSERT INTO {} ({}) VALUES {}",
             stmt.table.name,
-            stmt.columns.join(", "),
+            stmt.columns.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", "),
             stmt.values
                 .iter()
                 .map(|row| format!(
@@ -149,7 +152,7 @@ impl Transpiler {
         );
 
         if let Some(on_conflict) = &stmt.on_conflict {
-            let targets = on_conflict.target.join(", ");
+            let targets = on_conflict.target.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", ");
 
             match &on_conflict.action {
                 OnConflictAction::DoNothing => {
@@ -160,7 +163,7 @@ impl Transpiler {
                     sql.push_str(&format!(
                         " ON CONFLICT ({targets}) DO UPDATE SET {}",
                         set.iter()
-                            .map(|(col, val)| format!("{col} = {}", self.placeholder(val.clone(), false)))
+                            .map(|(col, val)| format!("{} = {}", col.name, self.placeholder(val.clone(), false)))
                             .collect::<Vec<_>>()
                             .join(", "),
                     ));
@@ -185,7 +188,7 @@ impl Transpiler {
             stmt.table.name,
             stmt.set
                 .iter()
-                .map(|(col, val)| format!("{col} = {}", self.placeholder(val.clone(), false)))
+                .map(|(col, val)| format!("{} = {}", col.name, self.placeholder(val.clone(), false)))
                 .collect::<Vec<_>>()
                 .join(", "),
         );
@@ -228,7 +231,7 @@ impl Transpiler {
             .chain(
                 stmt.drop_columns
                     .iter()
-                    .map(|col| format!("DROP COLUMN {col}")),
+                    .map(|col| format!("DROP COLUMN {}", col.name)),
             )
             .collect::<Vec<_>>();
 
@@ -362,8 +365,8 @@ impl Transpiler {
     fn projection(&mut self, proj: &Projection, inline: bool) -> String {
         match proj {
             Projection::All => "*".to_string(),
-            Projection::Column(col) => col.clone(),
-            Projection::ColumnAlias(col, alias) => format!("{col} AS {alias}"),
+            Projection::Column(col) => col.name.clone(),
+            Projection::ColumnAlias(col, alias) => format!("{} AS {alias}", col.name),
             Projection::Aggregate(agg) => self.aggregate(agg),
             Projection::Expression(expr) => self.expression(expr, inline),
             Projection::Aliased(inner, alias) => {
@@ -376,7 +379,7 @@ impl Transpiler {
         match expr {
             Expression::Value(val) => self.placeholder(val.clone(), inline),
 
-            Expression::Column(col) => col.clone(),
+            Expression::Column(col) => col.name.clone(),
 
             Expression::BinaryOp { left, op, right } => format!(
                 "({} {} {})",
@@ -428,19 +431,19 @@ impl Transpiler {
     fn aggregate(&self, agg: &AggregateFunction) -> String {
         match agg {
             AggregateFunction::Count(CountArg::All) => "CAST(COUNT(*) AS UBIGINT)".to_string(),
-            AggregateFunction::Count(CountArg::Column(col)) => format!("CAST(COUNT({col}) AS UBIGINT)"),
-            AggregateFunction::Count(CountArg::Distinct(col)) => format!("CAST(COUNT(DISTINCT {col}) AS UBIGINT)"),
-            AggregateFunction::Sum(col) => format!("CAST(SUM({col}) AS UBIGINT)"),
-            AggregateFunction::Avg(col) => format!("AVG({col})"),
-            AggregateFunction::Min(col) => format!("MIN({col})"),
-            AggregateFunction::Max(col) => format!("MAX({col})"),
-            AggregateFunction::ApproxCountDistinct(col) => format!("APPROX_COUNT_DISTINCT({col})"),
-            AggregateFunction::Uniq(col) => format!("APPROX_COUNT_DISTINCT({col})"),
+            AggregateFunction::Count(CountArg::Column(col)) => format!("CAST(COUNT({}) AS UBIGINT)", col.name),
+            AggregateFunction::Count(CountArg::Distinct(col)) => format!("CAST(COUNT(DISTINCT {}) AS UBIGINT)", col.name),
+            AggregateFunction::Sum(col) => format!("CAST(SUM({}) AS UBIGINT)", col.name),
+            AggregateFunction::Avg(col) => format!("AVG({})", col.name),
+            AggregateFunction::Min(col) => format!("MIN({})", col.name),
+            AggregateFunction::Max(col) => format!("MAX({})", col.name),
+            AggregateFunction::ApproxCountDistinct(col) => format!("APPROX_COUNT_DISTINCT({})", col.name),
+            AggregateFunction::Uniq(col) => format!("APPROX_COUNT_DISTINCT({})", col.name),
             AggregateFunction::Quantile { level, column } => {
-                format!("PERCENTILE_CONT({level}) WITHIN GROUP (ORDER BY {column})")
+                format!("PERCENTILE_CONT({level}) WITHIN GROUP (ORDER BY {})", column.name)
             }
-            AggregateFunction::TopK { k, column } => format!("APPROX_TOP_K({column}, {k})"),
-            AggregateFunction::Histogram { bins: _, column } => format!("histogram({column})"),
+            AggregateFunction::TopK { k, column } => format!("APPROX_TOP_K({}, {k})", column.name),
+            AggregateFunction::Histogram { bins: _, column } => format!("histogram({})", column.name),
             // State writes plain aggregates; Merge reads the stored value directly
             AggregateFunction::State(inner) => self.aggregate(inner),
             AggregateFunction::Merge(inner) => self.merge_column(inner),
@@ -449,17 +452,17 @@ impl Transpiler {
 
     fn merge_column(&self, inner: &AggregateFunction) -> String {
         match inner {
-            AggregateFunction::Count(CountArg::Column(col)) => col.clone(),
-            AggregateFunction::Count(CountArg::Distinct(col)) => col.clone(),
-            AggregateFunction::Sum(col) => col.clone(),
-            AggregateFunction::Avg(col) => col.clone(),
-            AggregateFunction::Min(col) => col.clone(),
-            AggregateFunction::Max(col) => col.clone(),
-            AggregateFunction::Uniq(col) => col.clone(),
-            AggregateFunction::ApproxCountDistinct(col) => col.clone(),
-            AggregateFunction::Quantile { column, .. } => column.clone(),
-            AggregateFunction::TopK { column, .. } => column.clone(),
-            AggregateFunction::Histogram { column, .. } => column.clone(),
+            AggregateFunction::Count(CountArg::Column(col)) => col.name.clone(),
+            AggregateFunction::Count(CountArg::Distinct(col)) => col.name.clone(),
+            AggregateFunction::Sum(col) => col.name.clone(),
+            AggregateFunction::Avg(col) => col.name.clone(),
+            AggregateFunction::Min(col) => col.name.clone(),
+            AggregateFunction::Max(col) => col.name.clone(),
+            AggregateFunction::Uniq(col) => col.name.clone(),
+            AggregateFunction::ApproxCountDistinct(col) => col.name.clone(),
+            AggregateFunction::Quantile { column, .. } => column.name.clone(),
+            AggregateFunction::TopK { column, .. } => column.name.clone(),
+            AggregateFunction::Histogram { column, .. } => column.name.clone(),
             // Fallback: emit the plain aggregate
             _ => self.aggregate(inner),
         }
@@ -508,31 +511,32 @@ impl Transpiler {
     pub fn condition(&mut self, expr: &ConditionExpression, inline: bool) -> String {
         match expr {
             ConditionExpression::Eq(col, val) => {
-                format!("{col} = {}", self.placeholder(val.clone(), inline))
+                format!("{} = {}", col.name, self.placeholder(val.clone(), inline))
             }
 
             ConditionExpression::Ne(col, val) => {
-                format!("{col} != {}", self.placeholder(val.clone(), inline))
+                format!("{} != {}", col.name, self.placeholder(val.clone(), inline))
             }
 
             ConditionExpression::Gt(col, val) => {
-                format!("{col} > {}", self.placeholder(val.clone(), inline))
+                format!("{} > {}", col.name, self.placeholder(val.clone(), inline))
             }
 
             ConditionExpression::Gte(col, val) => {
-                format!("{col} >= {}", self.placeholder(val.clone(), inline))
+                format!("{} >= {}", col.name, self.placeholder(val.clone(), inline))
             }
 
             ConditionExpression::Lt(col, val) => {
-                format!("{col} < {}", self.placeholder(val.clone(), inline))
+                format!("{} < {}", col.name, self.placeholder(val.clone(), inline))
             }
 
             ConditionExpression::Lte(col, val) => {
-                format!("{col} <= {}", self.placeholder(val.clone(), inline))
+                format!("{} <= {}", col.name, self.placeholder(val.clone(), inline))
             }
 
             ConditionExpression::In(col, vals) => format!(
-                "{col} IN ({})",
+                "{} IN ({})",
+                col.name,
                 vals.iter()
                     .map(|v| self.placeholder(v.clone(), inline))
                     .collect::<Vec<_>>()
@@ -540,33 +544,36 @@ impl Transpiler {
             ),
 
             ConditionExpression::NotIn(col, vals) => format!(
-                "{col} NOT IN ({})",
+                "{} NOT IN ({})",
+                col.name,
                 vals.iter()
                     .map(|v| self.placeholder(v.clone(), inline))
                     .collect::<Vec<_>>()
                     .join(", "),
             ),
 
-            ConditionExpression::IsNull(col) => format!("{col} IS NULL"),
+            ConditionExpression::IsNull(col) => format!("{} IS NULL", col.name),
 
-            ConditionExpression::IsNotNull(col) => format!("{col} IS NOT NULL"),
+            ConditionExpression::IsNotNull(col) => format!("{} IS NOT NULL", col.name),
 
             ConditionExpression::Like(col, pattern) => {
-                format!("{col} LIKE {}", self.placeholder(Value::String(pattern.clone()), inline))
+                format!("{} LIKE {}", col.name, self.placeholder(Value::String(pattern.clone()), inline))
             }
 
             ConditionExpression::NotLike(col, pattern) => {
-                format!("{col} NOT LIKE {}", self.placeholder(Value::String(pattern.clone()), inline))
+                format!("{} NOT LIKE {}", col.name, self.placeholder(Value::String(pattern.clone()), inline))
             }
 
             ConditionExpression::Between(col, low, high) => format!(
-                "{col} BETWEEN {} AND {}",
+                "{} BETWEEN {} AND {}",
+                col.name,
                 self.placeholder(low.clone(), inline),
                 self.placeholder(high.clone(), inline),
             ),
 
             ConditionExpression::NotBetween(col, low, high) => format!(
-                "{col} NOT BETWEEN {} AND {}",
+                "{} NOT BETWEEN {} AND {}",
+                col.name,
                 self.placeholder(low.clone(), inline),
                 self.placeholder(high.clone(), inline),
             ),

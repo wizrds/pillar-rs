@@ -4,6 +4,7 @@ use crate::{
     errors::Error,
     ast::{
         ColumnDefinition,
+        ColumnRef,
         CreateTableStatement,
         DeleteStatement,
         InsertStatement,
@@ -18,7 +19,6 @@ use crate::{
         TableRef,
         UpdateStatement,
     },
-    column::IntoColumnRef,
     condition::{Condition, ConditionExpression},
     database::Database,
     model::Model,
@@ -45,30 +45,21 @@ impl<M: Model> SelectEntity<M> {
     pub fn columns<I, C>(mut self, columns: I) -> Self
     where
         I: IntoIterator<Item = C>,
-        C: IntoColumnRef,
+        C: Into<ColumnRef>,
     {
         self.statement = self.statement
-            .projections(
-                columns
-                    .into_iter()
-                    .map(|column| Projection::Column(column.into_column_ref())),
-            );
+            .projections(columns.into_iter().map(Projection::column));
         self
     }
 
     /// Appends a column projection with an alias.
-    pub fn column_as<C: IntoColumnRef>(
+    pub fn column_as<C: Into<ColumnRef>>(
         mut self,
         column: C,
         alias: impl Into<String>,
     ) -> Self {
         self.statement = self.statement
-            .projection(
-                Projection::ColumnAlias(
-                    column.into_column_ref(),
-                    alias.into(),
-                )
-            );
+            .projection(Projection::column_alias(column, alias));
         self
     }
 
@@ -129,13 +120,9 @@ impl<M: Model> SelectEntity<M> {
     pub fn group_by<I, C>(mut self, columns: I) -> Self
     where
         I: IntoIterator<Item = C>,
-        C: IntoColumnRef,
+        C: Into<ColumnRef>,
     {
-        self.statement = self.statement.group_by(
-            columns
-                .into_iter()
-                .map(|column| column.into_column_ref()),
-        );
+        self.statement = self.statement.group_by(columns);
         self
     }
 
@@ -151,14 +138,14 @@ impl<M: Model> SelectEntity<M> {
     }
 
     /// Appends an ascending ORDER BY on the given column.
-    pub fn order_by_asc<C: IntoColumnRef>(mut self, column: C) -> Self {
-        self.statement = self.statement.order_by(OrderBy::asc(column.into_column_ref()));
+    pub fn order_by_asc<C: Into<ColumnRef>>(mut self, column: C) -> Self {
+        self.statement = self.statement.order_by(OrderBy::asc(column));
         self
     }
 
     /// Appends a descending ORDER BY on the given column.
-    pub fn order_by_desc<C: IntoColumnRef>(mut self, column: C) -> Self {
-        self.statement = self.statement.order_by(OrderBy::desc(column.into_column_ref()));
+    pub fn order_by_desc<C: Into<ColumnRef>>(mut self, column: C) -> Self {
+        self.statement = self.statement.order_by(OrderBy::desc(column));
         self
     }
 
@@ -198,28 +185,28 @@ impl<M: Model> SelectEntity<M> {
     }
 
     /// Appends a `COUNT(column)` aggregate projection.
-    pub fn count_column<C: IntoColumnRef>(self, column: C) -> Self {
-        self.aggregate(AggregateFunction::Count(CountArg::Column(column.into_column_ref())))
+    pub fn count_column<C: Into<ColumnRef>>(self, column: C) -> Self {
+        self.aggregate(AggregateFunction::count(column))
     }
 
     /// Appends a `SUM(column)` aggregate projection.
-    pub fn sum<C: IntoColumnRef>(self, column: C) -> Self {
-        self.aggregate(AggregateFunction::Sum(column.into_column_ref()))
+    pub fn sum<C: Into<ColumnRef>>(self, column: C) -> Self {
+        self.aggregate(AggregateFunction::sum(column))
     }
 
     /// Appends an `AVG(column)` aggregate projection.
-    pub fn avg<C: IntoColumnRef>(self, column: C) -> Self {
-        self.aggregate(AggregateFunction::Avg(column.into_column_ref()))
+    pub fn avg<C: Into<ColumnRef>>(self, column: C) -> Self {
+        self.aggregate(AggregateFunction::avg(column))
     }
 
     /// Appends a `MIN(column)` aggregate projection.
-    pub fn min<C: IntoColumnRef>(self, column: C) -> Self {
-        self.aggregate(AggregateFunction::Min(column.into_column_ref()))
+    pub fn min<C: Into<ColumnRef>>(self, column: C) -> Self {
+        self.aggregate(AggregateFunction::min(column))
     }
 
     /// Appends a `MAX(column)` aggregate projection.
-    pub fn max<C: IntoColumnRef>(self, column: C) -> Self {
-        self.aggregate(AggregateFunction::Max(column.into_column_ref()))
+    pub fn max<C: Into<ColumnRef>>(self, column: C) -> Self {
+        self.aggregate(AggregateFunction::max(column))
     }
 
     /// Converts this builder into a [`Statement`](crate::ast::Statement).
@@ -336,7 +323,7 @@ impl<M: Model> UpdateEntity<M> {
     }
 
     /// Appends a column/value assignment.
-    pub fn set(mut self, column: impl Into<String>, value: impl Into<Value>) -> Self {
+    pub fn set(mut self, column: impl Into<ColumnRef>, value: impl Into<Value>) -> Self {
         self.statement.set.push((column.into(), value.into()));
         self
     }

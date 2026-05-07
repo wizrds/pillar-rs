@@ -1,10 +1,10 @@
-pub mod table;
+pub mod refs;
 pub mod mutation;
 pub mod schema;
 pub mod select;
 pub mod ttl;
 
-pub use table::*;
+pub use refs::*;
 pub use mutation::*;
 pub use schema::*;
 pub use select::*;

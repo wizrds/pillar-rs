@@ -3,6 +3,7 @@ use futures::stream::{Stream, StreamExt};
 use crate::{
     errors::Error,
     ast::{
+        ColumnRef,
         CreateMaterializedViewStatement,
         OrderBy,
         Projection,
@@ -10,7 +11,6 @@ use crate::{
         Statement,
         TableRef,
     },
-    column::IntoColumnRef,
     condition::{Condition, ConditionExpression},
     database::Database,
     view::{MaterializedView, ViewQuery},
@@ -36,13 +36,10 @@ impl<V: MaterializedView> SelectView<V> {
     pub fn columns<I, C>(mut self, columns: I) -> Self
     where
         I: IntoIterator<Item = C>,
-        C: IntoColumnRef,
+        C: Into<ColumnRef>,
     {
-        self.statement = self.statement.projections(
-            columns
-                .into_iter()
-                .map(|c| Projection::Column(c.into_column_ref())),
-        );
+        self.statement = self.statement
+            .projections(columns.into_iter().map(Projection::column));
         self
     }
 
@@ -61,14 +58,14 @@ impl<V: MaterializedView> SelectView<V> {
     }
 
     /// Appends an ascending ORDER BY on the given column.
-    pub fn order_by_asc<C: IntoColumnRef>(mut self, column: C) -> Self {
-        self.statement = self.statement.order_by(OrderBy::asc(column.into_column_ref()));
+    pub fn order_by_asc<C: Into<ColumnRef>>(mut self, column: C) -> Self {
+        self.statement = self.statement.order_by(OrderBy::asc(column));
         self
     }
 
     /// Appends a descending ORDER BY on the given column.
-    pub fn order_by_desc<C: IntoColumnRef>(mut self, column: C) -> Self {
-        self.statement = self.statement.order_by(OrderBy::desc(column.into_column_ref()));
+    pub fn order_by_desc<C: Into<ColumnRef>>(mut self, column: C) -> Self {
+        self.statement = self.statement.order_by(OrderBy::desc(column));
         self
     }
 
