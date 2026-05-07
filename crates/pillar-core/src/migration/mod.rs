@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use crate::{
     ast::{
         ColumnDefinition, ColumnType, CreateTableStatement, InsertStatement,
-        OnConflict, OnConflictAction, Projection, SelectStatement, Statement, TableRef,
+        OnConflict, OnConflictAction, Projection, SelectStatement, Statement,
     },
     database::{AsDynDatabase, Database},
     errors::Error,
@@ -40,7 +40,7 @@ impl<M: Migrations> MigrationRunner<M> {
 
     async fn get_revision_id(&self, database: &dyn Database) -> Result<Option<String>, Error> {
         let result = database
-            .query(&Statement::TableExists("_migrations".to_owned()))
+            .query(&Statement::table_exists("_migrations"))
             .await?;
 
         let count = result
@@ -57,9 +57,9 @@ impl<M: Migrations> MigrationRunner<M> {
 
         Ok(
             database
-                .query(&Statement::Select(
-                    SelectStatement::new(TableRef::new("_migrations"))
-                        .projections(vec![Projection::Column("revision_id".into())])
+                .query(&Statement::select(
+                    SelectStatement::new("_migrations")
+                        .projections([Projection::column("revision_id")])
                         .limit(1u64),
                 ))
                 .await?
@@ -68,28 +68,28 @@ impl<M: Migrations> MigrationRunner<M> {
     }
 
     async fn set_revision_id(&self, database: &dyn Database, revision_id: &str) -> Result<(), Error> {
-        database.execute(&Statement::CreateTable(
-            CreateTableStatement::new("_migrations")
-                .if_not_exists()
-                .columns(vec![
-                    ColumnDefinition::new("revision_id", ColumnType::String).primary_key(),
-                ]),
-        ))
-        .await?;
+        database
+            .execute(&Statement::create_table(
+                CreateTableStatement::new("_migrations")
+                    .if_not_exists()
+                    .columns(vec![
+                        ColumnDefinition::new("revision_id", ColumnType::String).primary_key(),
+                    ]),
+            ))
+            .await?;
 
-        database.execute(&Statement::Insert(
-            InsertStatement::new(TableRef::new("_migrations"))
-                .columns(["revision_id"])
-                .values(vec![vec![Value::String(revision_id.to_owned())]])
-                .on_conflict(OnConflict {
-                    target: vec!["revision_id".into()],
-                    action: OnConflictAction::DoUpdate {
-                        set: vec![("revision_id".into(), Value::String(revision_id.to_owned()))],
-                        where_clause: None,
-                    },
-                }),
-        ))
-        .await?;
+        database
+            .execute(&Statement::insert(
+                InsertStatement::new("_migrations")
+                    .columns(["revision_id"])
+                    .values([[revision_id]])
+                    .on_conflict(
+                        OnConflict::new(OnConflictAction::do_update([
+                            ("revision_id", Value::string(revision_id))
+                        ]))
+                    )
+            ))
+            .await?;
 
         Ok(())
     }

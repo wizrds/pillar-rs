@@ -37,6 +37,110 @@ pub enum Value {
 }
 
 impl Value {
+    /// Creates a new [`Value::Null`](crate::value::Value::Null) instance.
+    pub fn null() -> Self {
+        Value::Null
+    }
+
+    /// Creates a new [`Value::Boolean`](crate::value::Value::Boolean) instance.
+    pub fn bool(value: impl Into<bool>) -> Self {
+        Value::Boolean(value.into())
+    }
+
+    /// Creates a new [`Value::Int8`](crate::value::Value::Int8) instance.
+    pub fn int8(value: impl Into<i8>) -> Self {
+        Value::Int8(value.into())
+    }
+
+    /// Creates a new [`Value::Int16`](crate::value::Value::Int16) instance.
+    pub fn int16(value: impl Into<i16>) -> Self {
+        Value::Int16(value.into())
+    }
+
+    /// Creates a new [`Value::Int32`](crate::value::Value::Int32) instance.
+    pub fn int32(value: impl Into<i32>) -> Self {
+        Value::Int32(value.into())
+    }
+
+    /// Creates a new [`Value::Int64`](crate::value::Value::Int64) instance.
+    pub fn int64(value: impl Into<i64>) -> Self {
+        Value::Int64(value.into())
+    }
+
+    /// Creates a new [`Value::UInt8`](crate::value::Value::UInt8) instance.
+    pub fn uint8(value: impl Into<u8>) -> Self {
+        Value::UInt8(value.into())
+    }
+
+    /// Creates a new [`Value::UInt16`](crate::value::Value::UInt16) instance.
+    pub fn uint16(value: impl Into<u16>) -> Self {
+        Value::UInt16(value.into())
+    }
+
+    /// Creates a new [`Value::UInt32`](crate::value::Value::UInt32) instance.
+    pub fn uint32(value: impl Into<u32>) -> Self {
+        Value::UInt32(value.into())
+    }
+
+    /// Creates a new [`Value::UInt64`](crate::value::Value::UInt64) instance.
+    pub fn uint64(value: impl Into<u64>) -> Self {
+        Value::UInt64(value.into())
+    }
+
+    /// Creates a new [`Value::Float32`](crate::value::Value::Float32) instance.
+    pub fn float32(value: impl Into<f32>) -> Self {
+        Value::Float32(value.into())
+    }
+
+    /// Creates a new [`Value::Float64`](crate::value::Value::Float64) instance.
+    pub fn float64(value: impl Into<f64>) -> Self {
+        Value::Float64(value.into())
+    }
+
+    /// Creates a new [`Value::String`](crate::value::Value::String) instance.
+    pub fn string(value: impl Into<String>) -> Self {
+        Value::String(value.into())
+    }
+
+    /// Creates a new [`Value::Bytes`](crate::value::Value::Bytes) instance.
+    pub fn bytes(value: impl Into<Vec<u8>>) -> Self {
+        Value::Bytes(value.into())
+    }
+
+    /// Creates a new [`Value::List`](crate::value::Value::List) instance.
+    pub fn list(value: impl IntoIterator<Item = impl Into<Value>>) -> Self {
+        Value::List(value.into_iter().map(Into::into).collect())
+    }
+
+    /// Creates a new [`Value::Map`](crate::value::Value::Map) instance.
+    pub fn map(value: impl IntoIterator<Item = (impl Into<Value>, impl Into<Value>)>) -> Self {
+        Value::Map(value.into_iter().map(|(k, v)| (k.into(), v.into())).collect())
+    }
+    
+    #[cfg(feature = "chrono")]
+    /// Creates a new [`Value::Date`](crate::value::Value::Date) instance.
+    pub fn date(value: impl Into<chrono::NaiveDate>) -> Self {
+        Value::Date(value.into())
+    }
+
+    #[cfg(feature = "chrono")]
+    /// Creates a new [`Value::Time`](crate::value::Value::Time) instance.
+    pub fn time(value: impl Into<chrono::NaiveTime>) -> Self {
+        Value::Time(value.into())
+    }
+
+    #[cfg(feature = "chrono")]
+    /// Creates a new [`Value::DateTime`](crate::value::Value::DateTime) instance.
+    pub fn datetime(value: impl Into<chrono::DateTime<chrono::Utc>>) -> Self {
+        Value::DateTime(value.into())
+    }
+
+    #[cfg(feature = "uuid")]
+    /// Creates a new [`Value::Uuid`](crate::value::Value::Uuid) instance.
+    pub fn uuid(value: impl Into<uuid::Uuid>) -> Self {
+        Value::Uuid(value.into())
+    }
+    
     /// Returns `true` if this value is [`Value::Null`](crate::value::Value::Null).
     pub fn is_null(&self) -> bool {
         matches!(self, Value::Null)
