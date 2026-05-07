@@ -146,7 +146,7 @@ impl Migration for CreateEventsTable {
     async fn up(&self, op: &MigrateOp<'_>) -> Result<(), Error> {
         op.create_table(
             CreateTableStatement::new("events")
-                .columns(vec![
+                .columns([
                     ColumnDefinition::new("id", ColumnType::Uuid).primary_key(),
                     ColumnDefinition::new("name", ColumnType::String),
                     ColumnDefinition::new("severity", ColumnType::Int32),
@@ -347,15 +347,15 @@ When the macro's `from`/`filter`/`aggregate` attributes are not expressive enoug
 ```rust
 impl ViewQuery for events_by_minute::View {
     fn query() -> SelectStatement {
-        SelectStatement::new(TableRef::new("events"))
-            .projections(vec![
-                Projection::Column("event_time".into()),
-                Projection::Column("host".into()),
-                Projection::Aggregate(AggregateFunction::Count(CountArg::All)),
-                Projection::Aggregate(AggregateFunction::Sum("duration_ms".into())),
-                Projection::Aggregate(AggregateFunction::Sum("bytes".into())),
+        SelectStatement::new("events")
+            .projections([
+                Projection::column("event_time"),
+                Projection::column("host"),
+                Projection::aggregate(AggregateFunction::count_all()),
+                Projection::aggregate(AggregateFunction::sum("duration_ms")),
+                Projection::aggregate(AggregateFunction::sum("bytes")),
             ])
-            .group_by(vec!["event_time".into(), "host".into()])
+            .group_by(["event_time", "host"])
     }
 }
 ```
