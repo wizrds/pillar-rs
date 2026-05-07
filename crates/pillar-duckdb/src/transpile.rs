@@ -23,9 +23,13 @@ impl Transpiler {
         Self { params: Vec::new(), count: 0 }
     }
 
+    fn value_to_sql(&self, value: &Value) -> String {
+        value.to_sql()
+    }
+
     fn placeholder(&mut self, value: Value, inline: bool) -> String {
         if inline {
-            return value.to_sql();
+            return self.value_to_sql(&value);
         }
         self.params.push(value);
         self.count += 1;
@@ -481,6 +485,9 @@ impl Transpiler {
             Statement::CreateTable(s) => self.create_table(s),
             Statement::AlterTable(s) => self.alter_table(s),
             Statement::DropTable(s) => self.drop_table(s),
+            Statement::TableExists(name) => Ok(format!(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = '{name}'"
+            )),
             Statement::CreateView(s) => self.create_view(s),
             Statement::CreateMaterializedView(s) => self.create_materialized_view(s),
             Statement::DropView(s) => self.drop_view(s),

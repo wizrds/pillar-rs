@@ -12,7 +12,15 @@ pub use traits::{
 };
 
 use async_trait::async_trait;
-use crate::{database::{AsDynDatabase, Database}, errors::Error};
+use crate::{
+    ast::{
+        ColumnDefinition, ColumnType, CreateTableStatement, DeleteStatement, InsertStatement,
+        Projection, SelectStatement, Statement, TableRef,
+    },
+    database::{AsDynDatabase, Database},
+    errors::Error,
+    value::Value,
+};
 
 
 /// Runs migrations for a given [`Migrations`](crate::migration::Migrations) collection against a database.
@@ -30,10 +38,70 @@ impl<M: Migrations> MigrationRunner<M> {
         }
     }
 
+    async fn get_revision_id(&self, database: &dyn Database) -> Result<Option<String>, Error> {
+        let result = database
+            .query(&Statement::TableExists("_migrations".to_owned()))
+            .await?;
+
+        let count = result
+            .get_as::<u64>(0, 0)
+            .unwrap_or_else(|| {
+                result
+                    .get_as::<i64>(0, 0)
+                    .unwrap_or(0) as u64
+            });
+
+        if count == 0 {
+            return Ok(None);
+        }
+
+        Ok(
+            database
+                .query(&Statement::Select(
+                    SelectStatement::new(TableRef::new("_migrations"))
+                        .projections(vec![Projection::Column("revision_id".into())])
+                        .limit(1),
+                ))
+                .await?
+                .get_as::<String>(0, 0)
+        )
+    }
+
+    async fn set_revision_id(&self, database: &dyn Database, revision_id: &str) -> Result<(), Error> {
+        let result = database
+            .query(&Statement::TableExists("_migrations".to_owned()))
+            .await?;
+
+        let count = result.get_as::<u64>(0, 0)
+            .unwrap_or_else(|| result.get_as::<i64>(0, 0).unwrap_or(0) as u64);
+
+        if count == 0 {
+            database.execute(&Statement::CreateTable(
+                CreateTableStatement::new("_migrations")
+                    .columns(vec![ColumnDefinition::new("revision_id", ColumnType::String)]),
+            ))
+            .await?;
+        } else {
+            database.execute(&Statement::Delete(
+                DeleteStatement::new(TableRef::new("_migrations")),
+            ))
+            .await?;
+        }
+
+        database.execute(&Statement::Insert(
+            InsertStatement::new(TableRef::new("_migrations"))
+                .columns(vec!["revision_id".into()])
+                .values(vec![vec![Value::String(revision_id.to_owned())]]),
+        ))
+        .await?;
+
+        Ok(())
+    }
+
     /// Applies all migrations up to the latest revision.
-    pub async fn upgrade(&self, db: &dyn Database) -> Result<(), Error> {
+    pub async fn upgrade(&self, database: &dyn Database) -> Result<(), Error> {
         self.upgrade_to(
-            db,
+            database,
             self.chain
                 .head()
                 .ok_or_else(|| Error::invalid_query("no head revision found"))?,
@@ -42,9 +110,9 @@ impl<M: Migrations> MigrationRunner<M> {
     }
 
     /// Reverts all migrations down to the earliest revision.
-    pub async fn downgrade(&self, db: &dyn Database) -> Result<(), Error> {
+    pub async fn downgrade(&self, database: &dyn Database) -> Result<(), Error> {
         self.downgrade_to(
-            db,
+            database,
             self.chain
                 .tail()
                 .ok_or_else(|| Error::invalid_query("no tail revision found"))?,
@@ -53,43 +121,66 @@ impl<M: Migrations> MigrationRunner<M> {
     }
 
     /// Applies migrations up to the given target revision ID.
-    pub async fn upgrade_to(&self, db: &dyn Database, target: &str) -> Result<(), Error> {
-        self.apply(db, target, MigrationDirection::Up).await
+    pub async fn upgrade_to(&self, database: &dyn Database, target: &str) -> Result<(), Error> {
+        self.apply(database, target, MigrationDirection::Up).await
     }
 
     /// Reverts migrations down to the given target revision ID.
-    pub async fn downgrade_to(&self, db: &dyn Database, target: &str) -> Result<(), Error> {
-        self.apply(db, target, MigrationDirection::Down).await
+    pub async fn downgrade_to(&self, database: &dyn Database, target: &str) -> Result<(), Error> {
+        self.apply(database, target, MigrationDirection::Down).await
     }
 
     async fn apply(
         &self,
-        db: &dyn Database,
+        database: &dyn Database,
         target: &str,
         direction: MigrationDirection,
     ) -> Result<(), Error> {
-        let op = MigrateOp::new(db);
+        let current_revision = self.get_revision_id(database).await?;
+        let op = MigrateOp::new(database);
 
         let path = match direction {
-            MigrationDirection::Up => self
-                .chain
-                .upgrade_path(self.chain.tail().unwrap_or(""), target)
-                .ok_or_else(|| {
-                    Error::invalid_query(format!("no upgrade path to '{target}'"))
-                })?,
+            MigrationDirection::Up => {
+                let from = current_revision
+                    .as_deref()
+                    .unwrap_or_else(|| self.chain.tail().unwrap_or(""));
 
-            MigrationDirection::Down => self
-                .chain
-                .downgrade_path(self.chain.head().unwrap_or(""), target)
-                .ok_or_else(|| {
-                    Error::invalid_query(format!("no downgrade path to '{target}'"))
-                })?,
+                let path = self.chain
+                    .upgrade_path(from, target)
+                    .ok_or_else(|| {
+                        Error::invalid_query(format!("no upgrade path to '{target}'"))
+                    })?;
+
+                if current_revision.is_some() {
+                    path.into_iter().skip(1).collect()
+                } else {
+                    path
+                }
+            },
+            MigrationDirection::Down => {
+                let from = current_revision
+                    .as_deref()
+                    .unwrap_or_else(|| self.chain.head().unwrap_or(""));
+
+                self.chain
+                    .downgrade_path(from, target)
+                    .ok_or_else(|| {
+                        Error::invalid_query(format!("no downgrade path to '{target}'"))
+                    })?
+            },
         };
 
         for migration in path {
             match direction {
-                MigrationDirection::Up => migration.up(&op).await?,
-                MigrationDirection::Down => migration.down(&op).await?,
+                MigrationDirection::Up => {
+                    migration.up(&op).await?;
+                    self.set_revision_id(database, migration.id()).await?;
+                }
+
+                MigrationDirection::Down => {
+                    migration.down(&op).await?;
+                    self.set_revision_id(database, migration.previous_id().unwrap_or("")).await?;
+                }
             }
         }
 
@@ -103,22 +194,29 @@ impl<M: Migrations> Default for MigrationRunner<M> {
     }
 }
 
-
 #[async_trait]
 impl<D: Database> Migrator for D {
     async fn upgrade<M: Migrations + 'static>(&self) -> Result<(), Error> {
-        MigrationRunner::<M>::new().upgrade(self.as_dyn()).await
+        MigrationRunner::<M>::new()
+            .upgrade(self.as_dyn())
+            .await
     }
 
     async fn upgrade_to<M: Migrations + 'static>(&self, target: &str) -> Result<(), Error> {
-        MigrationRunner::<M>::new().upgrade_to(self.as_dyn(), target).await
+        MigrationRunner::<M>::new()
+            .upgrade_to(self.as_dyn(), target)
+            .await
     }
 
     async fn downgrade<M: Migrations + 'static>(&self) -> Result<(), Error> {
-        MigrationRunner::<M>::new().downgrade(self.as_dyn()).await
+        MigrationRunner::<M>::new()
+            .downgrade(self.as_dyn())
+            .await
     }
 
     async fn downgrade_to<M: Migrations + 'static>(&self, target: &str) -> Result<(), Error> {
-        MigrationRunner::<M>::new().downgrade_to(self.as_dyn(), target).await
+        MigrationRunner::<M>::new()
+            .downgrade_to(self.as_dyn(), target)
+            .await
     }
 }

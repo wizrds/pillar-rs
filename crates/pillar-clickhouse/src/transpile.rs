@@ -23,9 +23,17 @@ impl Transpiler {
         Self { params: Vec::new(), count: 0 }
     }
 
+    fn value_to_sql(&self, value: &Value) -> String {
+        match value {
+            #[cfg(feature = "chrono")]
+            Value::DateTime(dt) => format!("'{}'", dt.format("%Y-%m-%d %H:%M:%S%.9f")),
+            other => other.to_sql(),
+        }
+    }
+
     fn placeholder(&mut self, value: Value, inline: bool) -> String {
         if inline {
-            return value.to_sql();
+            return self.value_to_sql(&value);
         }
         self.params.push(value);
         self.count += 1;
@@ -284,9 +292,7 @@ impl Transpiler {
 
         if let Some(to_table) = &stmt.to_table {
             sql.push_str(&format!(" TO {to_table}"));
-        }
-
-        if let Some(engine) = stmt.options.get("engine") {
+        } else if let Some(engine) = stmt.options.get("engine") {
             sql.push_str(&format!(" ENGINE = {engine}"));
         }
 
@@ -330,7 +336,7 @@ impl Transpiler {
             #[cfg(feature = "chrono")]
             ColumnType::Time => "String".to_string(),
             #[cfg(feature = "chrono")]
-            ColumnType::DateTime => "DateTime".to_string(),
+            ColumnType::DateTime => "DateTime64(9)".to_string(),
             #[cfg(feature = "uuid")]
             ColumnType::Uuid => "UUID".to_string(),
             ColumnType::DateTime64 { precision } => format!("DateTime64({precision})"),
@@ -476,6 +482,9 @@ impl Transpiler {
             Statement::CreateTable(s) => self.create_table(s),
             Statement::AlterTable(s) => self.alter_table(s),
             Statement::DropTable(s) => self.drop_table(s),
+            Statement::TableExists(name) => Ok(format!(
+                "SELECT count(*) FROM system.tables WHERE database = currentDatabase() AND name = '{name}'"
+            )),
             Statement::CreateView(s) => self.create_view(s),
             Statement::CreateMaterializedView(s) => self.create_materialized_view(s),
             Statement::DropView(s) => self.drop_view(s),
@@ -836,7 +845,7 @@ mod tests {
         ));
         assert_eq!(
             sql,
-            "CREATE MATERIALIZED VIEW high_severity_mv TO high_severity_local ENGINE = MergeTree() POPULATE AS SELECT * FROM events WHERE severity >= 3",
+            "CREATE MATERIALIZED VIEW high_severity_mv TO high_severity_local POPULATE AS SELECT * FROM events WHERE severity >= 3",
         );
         assert!(params.is_empty());
     }

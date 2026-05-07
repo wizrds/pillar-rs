@@ -30,6 +30,8 @@ pub enum Statement {
     AlterTable(AlterTableStatement),
     /// A `DROP TABLE` statement.
     DropTable(DropTableStatement),
+    /// Checks whether a table with the given name exists.
+    TableExists(String),
     /// A `CREATE VIEW` statement.
     CreateView(CreateViewStatement),
     /// A `CREATE MATERIALIZED VIEW` statement.

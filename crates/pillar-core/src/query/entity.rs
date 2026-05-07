@@ -256,6 +256,7 @@ impl<M: Model> SelectEntity<M> {
             database
                 .query(&self.into_statement())
                 .await?
+                .into_batch()
         )
     }
 
@@ -277,7 +278,7 @@ impl<M: Model> SelectEntity<M> {
                 .await?
                 .map(|batch_result| {
                     batch_result
-                        .and_then(|batch| M::from_record_batch(batch))
+                        .and_then(|r| M::from_record_batch(r.into_batch()))
                         .map_err(Error::from)
                 })
         )

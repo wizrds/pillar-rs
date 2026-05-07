@@ -7,9 +7,10 @@ use futures::AsyncReadExt;
 
 use pillar_core::{
     ast::Statement,
-    database::{Database, ExecutionResult},
+    database::Database,
     dialect::Dialect,
     errors::Error,
+    types::{ExecutionResult, QueryResult},
     value::Value,
 };
 
@@ -25,6 +26,14 @@ pub struct ClickHouseDatabase {
 }
 
 impl ClickHouseDatabase {
+    pub fn new(client: clickhouse::Client) -> Self {
+        Self { client, dialect: ClickHouseDialect }
+    }
+
+    pub fn builder(url: impl Into<String>) -> ClickHouseDatabaseBuilder {
+        ClickHouseDatabaseBuilder::new(url)
+    }
+
     fn bind_params(mut query: clickhouse::query::Query, params: &[Value]) -> clickhouse::query::Query {
         for param in params {
             query = match param {
@@ -107,7 +116,7 @@ impl Database for ClickHouseDatabase {
             .map_err(|e| Error::connection(e.to_string()))
     }
 
-    async fn query(&self, statement: &Statement) -> Result<RecordBatch, Error> {
+    async fn query(&self, statement: &Statement) -> Result<QueryResult, Error> {
         let prepared = self.dialect.transpile(statement)?;
 
         let cursor = Self::bind_params(self.client.query(&prepared.sql), &prepared.params)
@@ -122,8 +131,9 @@ impl Database for ClickHouseDatabase {
 
         match batches.len() {
             0 => Err(Error::unexpected("query returned no record batches")),
-            1 => Ok(batches.into_iter().next().unwrap()),
+            1 => Ok(QueryResult::from(batches.into_iter().next().unwrap())),
             _ => arrow::compute::concat_batches(&batches[0].schema(), &batches)
+                .map(QueryResult::from)
                 .map_err(|e| Error::unexpected(e.to_string())),
         }
     }
@@ -131,14 +141,17 @@ impl Database for ClickHouseDatabase {
     async fn query_stream(
         &self,
         statement: &Statement,
-    ) -> Result<BoxStream<'_, Result<RecordBatch, Error>>, Error> {
+    ) -> Result<BoxStream<'_, Result<QueryResult, Error>>, Error> {
         let prepared = self.dialect.transpile(statement)?;
 
-        Ok(Box::pin(Self::decode_stream(
-            Self::bind_params(self.client.query(&prepared.sql), &prepared.params)
-                .fetch_bytes("ArrowStream")
-                .map_err(|e| Error::connection(e.to_string()))?
-        )))
+        Ok(Box::pin(
+            Self::decode_stream(
+                Self::bind_params(self.client.query(&prepared.sql), &prepared.params)
+                    .fetch_bytes("ArrowStream")
+                    .map_err(|e| Error::connection(e.to_string()))?,
+            )
+            .map(|r| r.map(QueryResult::from)),
+        ))
     }
 }
 
@@ -146,7 +159,7 @@ impl Database for ClickHouseDatabase {
 pub struct ClickHouseDatabaseBuilder {
     url: String,
     database: Option<String>,
-    user: Option<String>,
+    username: Option<String>,
     password: Option<String>,
 }
 
@@ -156,7 +169,7 @@ impl ClickHouseDatabaseBuilder {
         Self {
             url: url.into(),
             database: None,
-            user: None,
+            username: None,
             password: None,
         }
     }
@@ -168,8 +181,8 @@ impl ClickHouseDatabaseBuilder {
     }
 
     /// Sets the username.
-    pub fn user(mut self, user: impl Into<String>) -> Self {
-        self.user = Some(user.into());
+    pub fn username(mut self, username: impl Into<String>) -> Self {
+        self.username = Some(username.into());
         self
     }
 
@@ -188,14 +201,14 @@ impl ClickHouseDatabaseBuilder {
             client = client.with_database(db);
         }
 
-        if let Some(user) = self.user {
-            client = client.with_user(user);
+        if let Some(username) = self.username {
+            client = client.with_user(username);
         }
 
         if let Some(password) = self.password {
             client = client.with_password(password);
         }
 
-        ClickHouseDatabase { client, dialect: ClickHouseDialect }
+        ClickHouseDatabase::new(client)
     }
 }

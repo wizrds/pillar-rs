@@ -98,7 +98,12 @@ impl<V: MaterializedView> SelectView<V> {
 
     /// Executes the query and returns all matching rows.
     pub async fn all<D: Database>(self, database: &D) -> Result<Vec<V>, Error> {
-        V::from_record_batch(database.query(&self.into_statement()).await?)
+        V::from_record_batch(
+            database
+                .query(&self.into_statement())
+                .await?
+                .into_batch()
+        )
     }
 
     /// Executes the query and returns the first matching row, if any.
@@ -111,10 +116,12 @@ impl<V: MaterializedView> SelectView<V> {
         self,
         database: &D,
     ) -> Result<impl Stream<Item = Result<Vec<V>, Error>>, Error> {
-        Ok(database
-            .query_stream(&self.into_statement())
-            .await?
-            .map(|batch| batch.and_then(|b| V::from_record_batch(b)).map_err(Error::from)))
+        Ok(
+            database
+                .query_stream(&self.into_statement())
+                .await?
+                .map(|r| r.and_then(|qr| V::from_record_batch(qr.into_batch())).map_err(Error::from))
+        )
     }
 }
 
@@ -139,7 +146,8 @@ pub trait ViewSchema: ViewQuery + Sized {
     /// Returns a [`Statement`](crate::ast::Statement) that creates this materialized view.
     fn create_statement() -> Statement {
         Statement::CreateMaterializedView(
-            CreateMaterializedViewStatement::new(Self::view_name(), Self::query()),
+            CreateMaterializedViewStatement::new(Self::view_name(), Self::query())
+                .if_not_exists(),
         )
     }
 }

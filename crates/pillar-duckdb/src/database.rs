@@ -1,12 +1,13 @@
 use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use futures::stream::{self, BoxStream};
-use arrow::{compute::concat_batches, record_batch::RecordBatch};
+use arrow::compute::concat_batches;
 use pillar_core::{
     ast::Statement,
     errors::Error,
-    database::{Database, ExecutionResult},
+    database::Database,
     dialect::Dialect,
+    types::{ExecutionResult, QueryResult},
 };
 
 use crate::{dialect::DuckDbDialect, normalize::BatchNormalizer, value::DuckDbValue};
@@ -81,7 +82,7 @@ impl Database for DuckDbDatabase {
         .await
     }
 
-    async fn query(&self, statement: &Statement) -> Result<RecordBatch, Error> {
+    async fn query(&self, statement: &Statement) -> Result<QueryResult, Error> {
         let prepared = self.dialect.transpile(statement)?;
         let conn = Arc::clone(&self.conn);
 
@@ -107,12 +108,13 @@ impl Database for DuckDbDatabase {
         })
         .await
         .and_then(|batch| self.normalizer.normalize(batch))
+        .map(QueryResult::from)
     }
 
     async fn query_stream(
         &self,
         statement: &Statement,
-    ) -> Result<BoxStream<'_, Result<RecordBatch, Error>>, Error> {
+    ) -> Result<BoxStream<'_, Result<QueryResult, Error>>, Error> {
         let prepared = self.dialect.transpile(statement)?;
         let conn = Arc::clone(&self.conn);
 
@@ -136,7 +138,7 @@ impl Database for DuckDbDatabase {
             })
             .await?
             .into_iter()
-            .map(|batch| self.normalizer.normalize(batch))
+            .map(|batch| self.normalizer.normalize(batch).map(QueryResult::from))
         )))
     }
 }

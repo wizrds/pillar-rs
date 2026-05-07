@@ -215,6 +215,7 @@ fn view_schema_impl(fields: &[FieldAttrs], attrs: &ViewAttrs) -> syn::Result<Tok
                         Self::view_name(),
                         <Self as ::pillar::view::ViewQuery>::query(),
                     )
+                    .if_not_exists()
                     #to_table_call
                     #option_calls
                 )

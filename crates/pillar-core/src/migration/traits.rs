@@ -11,7 +11,8 @@ use crate::{
         Statement,
     },
     errors::Error,
-    database::{AsDynDatabase, Database, ExecutionResult},
+    database::{AsDynDatabase, Database},
+    types::ExecutionResult,
 };
 
 
