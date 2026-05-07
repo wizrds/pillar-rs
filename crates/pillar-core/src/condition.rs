@@ -1,4 +1,7 @@
-use crate::value::Value;
+use crate::{
+    column::IntoColumnRef,
+    value::Value,
+};
 
 
 /// A single SQL condition predicate used in WHERE and HAVING clauses.
@@ -42,73 +45,73 @@ pub enum ConditionExpression {
 
 impl ConditionExpression {
     /// Creates an equality condition.
-    pub fn eq(column: impl Into<String>, value: impl Into<Value>) -> Self {
-        ConditionExpression::Eq(column.into(), value.into())
+    pub fn eq(column: impl IntoColumnRef, value: impl Into<Value>) -> Self {
+        ConditionExpression::Eq(column.into_column_ref(), value.into())
     }
 
     /// Creates an inequality condition.
-    pub fn ne(column: impl Into<String>, value: impl Into<Value>) -> Self {
-        ConditionExpression::Ne(column.into(), value.into())
+    pub fn ne(column: impl IntoColumnRef, value: impl Into<Value>) -> Self {
+        ConditionExpression::Ne(column.into_column_ref(), value.into())
     }
 
     /// Creates a greater-than condition.
-    pub fn gt(column: impl Into<String>, value: impl Into<Value>) -> Self {
-        ConditionExpression::Gt(column.into(), value.into())
+    pub fn gt(column: impl IntoColumnRef, value: impl Into<Value>) -> Self {
+        ConditionExpression::Gt(column.into_column_ref(), value.into())
     }
 
     /// Creates a greater-than-or-equal condition.
-    pub fn gte(column: impl Into<String>, value: impl Into<Value>) -> Self {
-        ConditionExpression::Gte(column.into(), value.into())
+    pub fn gte(column: impl IntoColumnRef, value: impl Into<Value>) -> Self {
+        ConditionExpression::Gte(column.into_column_ref(), value.into())
     }
 
     /// Creates a less-than condition.
-    pub fn lt(column: impl Into<String>, value: impl Into<Value>) -> Self {
-        ConditionExpression::Lt(column.into(), value.into())
+    pub fn lt(column: impl IntoColumnRef, value: impl Into<Value>) -> Self {
+        ConditionExpression::Lt(column.into_column_ref(), value.into())
     }
 
     /// Creates a less-than-or-equal condition.
-    pub fn lte(column: impl Into<String>, value: impl Into<Value>) -> Self {
-        ConditionExpression::Lte(column.into(), value.into())
+    pub fn lte(column: impl IntoColumnRef, value: impl Into<Value>) -> Self {
+        ConditionExpression::Lte(column.into_column_ref(), value.into())
     }
 
     /// Creates an `IN` condition.
-    pub fn in_list(column: impl Into<String>, values: Vec<Value>) -> Self {
-        ConditionExpression::In(column.into(), values)
+    pub fn in_list(column: impl IntoColumnRef, values: Vec<Value>) -> Self {
+        ConditionExpression::In(column.into_column_ref(), values)
     }
 
     /// Creates a `NOT IN` condition.
-    pub fn is_not_in(column: impl Into<String>, values: Vec<Value>) -> Self {
-        ConditionExpression::NotIn(column.into(), values)
+    pub fn is_not_in(column: impl IntoColumnRef, values: Vec<Value>) -> Self {
+        ConditionExpression::NotIn(column.into_column_ref(), values)
     }
 
     /// Creates an `IS NULL` condition.
-    pub fn is_null(column: impl Into<String>) -> Self {
-        ConditionExpression::IsNull(column.into())
+    pub fn is_null(column: impl IntoColumnRef) -> Self {
+        ConditionExpression::IsNull(column.into_column_ref())
     }
 
     /// Creates an `IS NOT NULL` condition.
-    pub fn is_not_null(column: impl Into<String>) -> Self {
-        ConditionExpression::IsNotNull(column.into())
+    pub fn is_not_null(column: impl IntoColumnRef) -> Self {
+        ConditionExpression::IsNotNull(column.into_column_ref())
     }
 
     /// Creates a `LIKE` condition.
-    pub fn like(column: impl Into<String>, pattern: impl Into<String>) -> Self {
-        ConditionExpression::Like(column.into(), pattern.into())
+    pub fn like(column: impl IntoColumnRef, pattern: impl Into<String>) -> Self {
+        ConditionExpression::Like(column.into_column_ref(), pattern.into())
     }
 
     /// Creates a `NOT LIKE` condition.
-    pub fn not_like(column: impl Into<String>, pattern: impl Into<String>) -> Self {
-        ConditionExpression::NotLike(column.into(), pattern.into())
+    pub fn not_like(column: impl IntoColumnRef, pattern: impl Into<String>) -> Self {
+        ConditionExpression::NotLike(column.into_column_ref(), pattern.into())
     }
 
     /// Creates a `BETWEEN` condition.
-    pub fn between(column: impl Into<String>, low: impl Into<Value>, high: impl Into<Value>) -> Self {
-        ConditionExpression::Between(column.into(), low.into(), high.into())
+    pub fn between(column: impl IntoColumnRef, low: impl Into<Value>, high: impl Into<Value>) -> Self {
+        ConditionExpression::Between(column.into_column_ref(), low.into(), high.into())
     }
 
     /// Creates a `NOT BETWEEN` condition.
-    pub fn not_between(column: impl Into<String>, low: impl Into<Value>, high: impl Into<Value>) -> Self {
-        ConditionExpression::NotBetween(column.into(), low.into(), high.into())
+    pub fn not_between(column: impl IntoColumnRef, low: impl Into<Value>, high: impl Into<Value>) -> Self {
+        ConditionExpression::NotBetween(column.into_column_ref(), low.into(), high.into())
     }
 
     /// Combines this expression with another using `AND`.
@@ -177,18 +180,12 @@ impl Condition {
     }
 
     /// Creates an AND condition from an iterator of expressions.
-    pub fn all_of<I>(iter: I) -> Self
-    where
-        I: IntoIterator<Item = ConditionExpression>,
-    {
+    pub fn all_of(iter: impl IntoIterator<Item = ConditionExpression>) -> Self {
         Condition::All(iter.into_iter().collect())
     }
 
     /// Creates an OR condition from an iterator of expressions.
-    pub fn any_of<I>(iter: I) -> Self
-    where
-        I: IntoIterator<Item = ConditionExpression>,
-    {
+    pub fn any_of(iter: impl IntoIterator<Item = ConditionExpression>) -> Self {
         Condition::Any(iter.into_iter().collect())
     }
 

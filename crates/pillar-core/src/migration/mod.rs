@@ -60,7 +60,7 @@ impl<M: Migrations> MigrationRunner<M> {
                 .query(&Statement::Select(
                     SelectStatement::new(TableRef::new("_migrations"))
                         .projections(vec![Projection::Column("revision_id".into())])
-                        .limit(1),
+                        .limit(1u64),
                 ))
                 .await?
                 .get_as::<String>(0, 0)
@@ -79,7 +79,7 @@ impl<M: Migrations> MigrationRunner<M> {
 
         database.execute(&Statement::Insert(
             InsertStatement::new(TableRef::new("_migrations"))
-                .columns(vec!["revision_id".into()])
+                .columns(["revision_id"])
                 .values(vec![vec![Value::String(revision_id.to_owned())]])
                 .on_conflict(OnConflict {
                     target: vec!["revision_id".into()],

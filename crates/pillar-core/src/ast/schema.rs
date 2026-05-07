@@ -7,10 +7,12 @@ use arrow::datatypes::{DataType, Field};
 use arrow::datatypes::TimeUnit;
 
 use crate::{
+    column::IntoColumnRef,
     errors::Error,
     value::Value,
     ast::{
         select::SelectStatement,
+        table::TableRef,
         ttl::TtlClause,
     },
 };
@@ -59,6 +61,47 @@ pub enum ColumnType {
 }
 
 impl ColumnType {
+    /// A list of values of the given type.
+    pub fn list(inner: impl Into<ColumnType>) -> Self {
+        Self::List(Box::new(inner.into()))
+    }
+
+    /// A map from keys of one type to values of another.
+    pub fn map(key: impl Into<ColumnType>, value: impl Into<ColumnType>) -> Self {
+        Self::Map(Box::new(key.into()), Box::new(value.into()))
+    }
+
+    /// Wraps this type in an explicit nullable marker.
+    pub fn nullable(inner: impl Into<ColumnType>) -> Self {
+        Self::Nullable(Box::new(inner.into()))
+    }
+
+    /// An aggregate state column for the given function and argument types.
+    pub fn aggregate_state(
+        function: AggregateFn,
+        arg_types: impl IntoIterator<Item = ColumnType>,
+    ) -> Self {
+        Self::AggregateState(AggregateStateFunction {
+            function,
+            arg_types: arg_types.into_iter().collect(),
+        })
+    }
+
+    /// A fixed-length string of exactly `n` bytes.
+    pub fn fixed_string(n: u32) -> Self {
+        Self::FixedString(n)
+    }
+
+    /// A high-precision timestamp with the given sub-second precision digits (0–9).
+    pub fn datetime64(precision: u8) -> Self {
+        Self::DateTime64 { precision }
+    }
+
+    /// A raw type string passed through to the backend as-is.
+    pub fn custom(s: impl Into<String>) -> Self {
+        Self::Custom(s.into())
+    }
+
     /// Maps this column type to its Arrow [`DataType`](arrow::datatypes::DataType) equivalent.
     ///
     /// Returns an error for types that have no valid Arrow representation.
@@ -122,8 +165,8 @@ pub struct AggregateStateFunction {
 
 impl AggregateStateFunction {
     /// Creates a new [`AggregateStateFunction`](crate::ast::AggregateStateFunction) with the given function and argument types.
-    pub fn new(function: AggregateFn, arg_types: Vec<ColumnType>) -> Self {
-        Self { function, arg_types }
+    pub fn new(function: AggregateFn, arg_types: impl IntoIterator<Item = ColumnType>) -> Self {
+        Self { function, arg_types: arg_types.into_iter().collect() }
     }
 }
 
@@ -140,6 +183,58 @@ pub enum AggregateFn {
     TopK(u32),
     Histogram(u32),
     Custom(String),
+}
+
+impl AggregateFn {
+    /// `COUNT` aggregate.
+    pub fn count() -> Self {
+        Self::Count
+    }
+
+    /// `SUM` aggregate.
+    pub fn sum() -> Self {
+        Self::Sum
+    }
+
+    /// `AVG` aggregate.
+    pub fn avg() -> Self {
+        Self::Avg
+    }
+
+    /// `MIN` aggregate.
+    pub fn min() -> Self {
+        Self::Min
+    }
+
+    /// `MAX` aggregate.
+    pub fn max() -> Self {
+        Self::Max
+    }
+
+    /// `uniq` aggregate or equivalent.
+    pub fn uniq() -> Self {
+        Self::Uniq
+    }
+
+    /// `QUANTILE(level)` aggregate or equivalent.
+    pub fn quantile(level: f64) -> Self {
+        Self::Quantile(level)
+    }
+
+    /// `topK(k)` aggregate or equivalent.
+    pub fn top_k(k: u32) -> Self {
+        Self::TopK(k)
+    }
+
+    /// `histogram(bins)` aggregate or equivalent.
+    pub fn histogram(bins: u32) -> Self {
+        Self::Histogram(bins)
+    }
+
+    /// A raw aggregate function name passed through to the backend as-is.
+    pub fn custom(s: impl Into<String>) -> Self {
+        Self::Custom(s.into())
+    }
 }
 
 /// Defines a single column in a [`CreateTableStatement`](crate::ast::CreateTableStatement) or [`AlterTableStatement`](crate::ast::AlterTableStatement).
@@ -203,9 +298,9 @@ pub struct CreateTableStatement {
 
 impl CreateTableStatement {
     /// Creates a new [`CreateTableStatement`](crate::ast::CreateTableStatement) for the given table name.
-    pub fn new(name: impl Into<String>) -> Self {
+    pub fn new(name: impl Into<TableRef>) -> Self {
         Self {
-            name: name.into(),
+            name: name.into().name,
             columns: Vec::new(),
             if_not_exists: false,
             options: HashMap::new(),
@@ -214,8 +309,14 @@ impl CreateTableStatement {
     }
 
     /// Sets the column definitions for the table.
-    pub fn columns(mut self, columns: Vec<ColumnDefinition>) -> Self {
-        self.columns = columns;
+    pub fn columns(mut self, columns: impl IntoIterator<Item = ColumnDefinition>) -> Self {
+        self.columns = columns.into_iter().collect();
+        self
+    }
+
+    /// Adds a single column definition.
+    pub fn column(mut self, column: ColumnDefinition) -> Self {
+        self.columns.push(column);
         self
     }
 
@@ -249,19 +350,31 @@ pub struct AlterTableStatement {
 
 impl AlterTableStatement {
     /// Creates a new [`AlterTableStatement`](crate::ast::AlterTableStatement) for the given table name.
-    pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into(), add_columns: Vec::new(), drop_columns: Vec::new(), ttl: None }
+    pub fn new(name: impl Into<TableRef>) -> Self {
+        Self { name: name.into().name, add_columns: Vec::new(), drop_columns: Vec::new(), ttl: None }
     }
 
     /// Sets the columns to add.
-    pub fn add_columns(mut self, columns: Vec<ColumnDefinition>) -> Self {
-        self.add_columns = columns;
+    pub fn add_columns(mut self, columns: impl IntoIterator<Item = ColumnDefinition>) -> Self {
+        self.add_columns = columns.into_iter().collect();
+        self
+    }
+
+    /// Adds a single column.
+    pub fn add_column(mut self, column: ColumnDefinition) -> Self {
+        self.add_columns.push(column);
         self
     }
 
     /// Sets the column names to drop.
-    pub fn drop_columns(mut self, columns: Vec<String>) -> Self {
-        self.drop_columns = columns;
+    pub fn drop_columns(mut self, columns: impl IntoIterator<Item = impl IntoColumnRef>) -> Self {
+        self.drop_columns = columns.into_iter().map(IntoColumnRef::into_column_ref).collect();
+        self
+    }
+
+    /// Drops a single column by name.
+    pub fn drop_column(mut self, column: impl IntoColumnRef) -> Self {
+        self.drop_columns.push(column.into_column_ref());
         self
     }
 
@@ -281,8 +394,8 @@ pub struct DropTableStatement {
 
 impl DropTableStatement {
     /// Creates a new [`DropTableStatement`](crate::ast::DropTableStatement) for the given table name.
-    pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into(), if_exists: false }
+    pub fn new(name: impl Into<TableRef>) -> Self {
+        Self { name: name.into().name, if_exists: false }
     }
 
     /// Adds `IF EXISTS` to the statement.
@@ -304,9 +417,9 @@ pub struct CreateViewStatement {
 
 impl CreateViewStatement {
     /// Creates a new [`CreateViewStatement`](crate::ast::CreateViewStatement) for the given view name and query.
-    pub fn new(name: impl Into<String>, query: SelectStatement) -> Self {
+    pub fn new(name: impl Into<TableRef>, query: SelectStatement) -> Self {
         Self {
-            name: name.into(),
+            name: name.into().name,
             query,
             or_replace: false,
             if_not_exists: false,
@@ -346,9 +459,9 @@ pub struct CreateMaterializedViewStatement {
 
 impl CreateMaterializedViewStatement {
     /// Creates a new [`CreateMaterializedViewStatement`](crate::ast::CreateMaterializedViewStatement) for the given view name and query.
-    pub fn new(name: impl Into<String>, query: SelectStatement) -> Self {
+    pub fn new(name: impl Into<TableRef>, query: SelectStatement) -> Self {
         Self {
-            name: name.into(),
+            name: name.into().name,
             query,
             or_replace: false,
             if_not_exists: false,
@@ -370,8 +483,8 @@ impl CreateMaterializedViewStatement {
     }
 
     /// Routes materialized view output to an existing table.
-    pub fn to_table(mut self, table: impl Into<String>) -> Self {
-        self.to_table = Some(table.into());
+    pub fn to_table(mut self, table: impl Into<TableRef>) -> Self {
+        self.to_table = Some(table.into().name);
         self
     }
 
@@ -392,8 +505,8 @@ pub struct DropViewStatement {
 
 impl DropViewStatement {
     /// Creates a new [`DropViewStatement`](crate::ast::DropViewStatement) for the given view name.
-    pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into(), if_exists: false, materialized: false }
+    pub fn new(name: impl Into<TableRef>) -> Self {
+        Self { name: name.into().name, if_exists: false, materialized: false }
     }
 
     /// Adds `IF EXISTS` to the statement.

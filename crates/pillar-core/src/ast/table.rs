@@ -17,3 +17,15 @@ impl TableRef {
         self
     }
 }
+
+impl From<String> for TableRef {
+    fn from(name: String) -> Self {
+        Self::new(name)
+    }
+}
+
+impl From<&str> for TableRef {
+    fn from(name: &str) -> Self {
+        Self::new(name)
+    }
+}

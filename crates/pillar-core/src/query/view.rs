@@ -41,8 +41,7 @@ impl<V: MaterializedView> SelectView<V> {
         self.statement = self.statement.projections(
             columns
                 .into_iter()
-                .map(|c| Projection::Column(c.into_column_ref()))
-                .collect(),
+                .map(|c| Projection::Column(c.into_column_ref())),
         );
         self
     }

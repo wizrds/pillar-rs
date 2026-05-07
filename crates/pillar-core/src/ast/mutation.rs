@@ -1,4 +1,5 @@
 use crate::{
+    column::IntoColumnRef,
     condition::ConditionExpression,
     value::Value,
     ast::table::TableRef,
@@ -12,6 +13,19 @@ pub struct OnConflict {
     pub action: OnConflictAction,
 }
 
+impl OnConflict {
+    /// Creates a new [`OnConflict`](crate::ast::OnConflict) with the given action and no conflict target columns.
+    pub fn new(action: OnConflictAction) -> Self {
+        Self { target: Vec::new(), action }
+    }
+
+    /// Sets the conflict target columns.
+    pub fn target(mut self, columns: impl IntoIterator<Item = impl IntoColumnRef>) -> Self {
+        self.target = columns.into_iter().map(IntoColumnRef::into_column_ref).collect();
+        self
+    }
+}
+
 /// The action to take when an [`OnConflict`](crate::ast::OnConflict) condition is met.
 #[derive(Debug, Clone, PartialEq)]
 pub enum OnConflictAction {
@@ -20,6 +34,34 @@ pub enum OnConflictAction {
         set: Vec<(String, Value)>,
         where_clause: Option<ConditionExpression>,
     },
+}
+
+impl OnConflictAction {
+    /// Creates a `DO NOTHING` action.
+    pub fn do_nothing() -> Self {
+        Self::DoNothing
+    }
+
+    /// Creates a `DO UPDATE SET` action with the given column/value pairs.
+    pub fn do_update<I, K, V>(set: I) -> Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: IntoColumnRef,
+        V: Into<Value>,
+    {
+        Self::DoUpdate {
+            set: set.into_iter().map(|(k, v)| (k.into_column_ref(), v.into())).collect(),
+            where_clause: None,
+        }
+    }
+
+    /// Adds a WHERE guard to a `DO UPDATE` action. Has no effect on `DO NOTHING`.
+    pub fn where_clause(self, condition: ConditionExpression) -> Self {
+        match self {
+            Self::DoUpdate { set, .. } => Self::DoUpdate { set, where_clause: Some(condition) },
+            other => other,
+        }
+    }
 }
 
 /// AST node for an `INSERT` statement.
@@ -33,19 +75,27 @@ pub struct InsertStatement {
 
 impl InsertStatement {
     /// Creates a new [`InsertStatement`](crate::ast::InsertStatement) targeting the given table.
-    pub fn new(table: TableRef) -> Self {
-        Self { table, columns: Vec::new(), values: Vec::new(), on_conflict: None }
+    pub fn new(table: impl Into<TableRef>) -> Self {
+        Self { table: table.into(), columns: Vec::new(), values: Vec::new(), on_conflict: None }
     }
 
     /// Sets the column names for the insert.
-    pub fn columns(mut self, columns: Vec<String>) -> Self {
-        self.columns = columns;
+    pub fn columns(mut self, columns: impl IntoIterator<Item = impl IntoColumnRef>) -> Self {
+        self.columns = columns.into_iter().map(IntoColumnRef::into_column_ref).collect();
         self
     }
 
     /// Sets the rows of values to insert.
-    pub fn values(mut self, values: Vec<Vec<Value>>) -> Self {
-        self.values = values;
+    pub fn values<R, I, V>(mut self, rows: R) -> Self
+    where
+        R: IntoIterator<Item = I>,
+        I: IntoIterator<Item = V>,
+        V: Into<Value>,
+    {
+        self.values = rows
+            .into_iter()
+            .map(|row| row.into_iter().map(Into::into).collect())
+            .collect();
         self
     }
 
@@ -66,13 +116,18 @@ pub struct UpdateStatement {
 
 impl UpdateStatement {
     /// Creates a new [`UpdateStatement`](crate::ast::UpdateStatement) targeting the given table.
-    pub fn new(table: TableRef) -> Self {
-        Self { table, set: Vec::new(), where_clause: None }
+    pub fn new(table: impl Into<TableRef>) -> Self {
+        Self { table: table.into(), set: Vec::new(), where_clause: None }
     }
 
     /// Sets the column/value pairs to update.
-    pub fn set(mut self, set: Vec<(String, Value)>) -> Self {
-        self.set = set;
+    pub fn set<I, K, V>(mut self, set: I) -> Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: IntoColumnRef,
+        V: Into<Value>,
+    {
+        self.set = set.into_iter().map(|(k, v)| (k.into_column_ref(), v.into())).collect();
         self
     }
 
@@ -92,8 +147,8 @@ pub struct DeleteStatement {
 
 impl DeleteStatement {
     /// Creates a new [`DeleteStatement`](crate::ast::DeleteStatement) targeting the given table.
-    pub fn new(table: TableRef) -> Self {
-        Self { table, where_clause: None }
+    pub fn new(table: impl Into<TableRef>) -> Self {
+        Self { table: table.into(), where_clause: None }
     }
 
     /// Sets the WHERE clause.

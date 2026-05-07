@@ -121,11 +121,12 @@ let database = DuckDbDatabase::in_memory().await?;
 ```rust
 use pillar::clickhouse::ClickHouseDatabase;
 
-let database = ClickHouseDatabase::builder()
-    .url("http://localhost:8123")
+let database = ClickHouseDatabase::builder("http://localhost:8123")
     .database("my_db")
-    .build()
-    .await?;
+    .username("default")
+    .password("secret")
+    .setting("max_execution_time", "30")
+    .build();
 ```
 
 ### Migrations

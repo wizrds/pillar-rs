@@ -553,11 +553,11 @@ impl Transpiler {
 mod tests {
     use pillar_core::{
         ast::{
-            AggregateFunction, AlterTableStatement, ColumnDefinition, CountArg,
+            AggregateFunction, AlterTableStatement, ColumnDefinition,
             CreateMaterializedViewStatement, CreateTableStatement, CreateViewStatement,
             DeleteStatement, DropTableStatement, DropViewStatement, InsertStatement, Interval,
-            IntervalUnit, Projection, SelectStatement, Statement, TableRef, TtlClause,
-            UpdateStatement, AggregateFn, AggregateStateFunction, ColumnType
+            Projection, SelectStatement, Statement, TtlClause,
+            UpdateStatement, AggregateFn, ColumnType,
         },
         condition::ConditionExpression,
         value::Value,
@@ -582,15 +582,15 @@ mod tests {
 
     #[test]
     fn test_select_all() {
-        let (sql, params) = transpile(Statement::Select(SelectStatement::new(TableRef::new("events"))));
+        let (sql, params) = transpile(Statement::select(SelectStatement::new("events")));
         assert_eq!(sql, "SELECT * FROM events");
         assert!(params.is_empty());
     }
 
     #[test]
     fn test_select_with_filter() {
-        let (sql, params) = transpile(Statement::Select(
-            SelectStatement::new(TableRef::new("events"))
+        let (sql, params) = transpile(Statement::select(
+            SelectStatement::new("events")
                 .where_clause(ConditionExpression::eq("id", 42i64)),
         ));
         assert_eq!(sql, "SELECT * FROM events WHERE id = ?");
@@ -599,8 +599,8 @@ mod tests {
 
     #[test]
     fn test_select_limit_offset() {
-        let (sql, params) = transpile(Statement::Select(
-            SelectStatement::new(TableRef::new("events")).limit(10).offset(20),
+        let (sql, params) = transpile(Statement::select(
+            SelectStatement::new("events").limit(10u64).offset(20u64),
         ));
         assert_eq!(sql, "SELECT * FROM events LIMIT 10 OFFSET 20");
         assert!(params.is_empty());
@@ -608,9 +608,9 @@ mod tests {
 
     #[test]
     fn test_select_approx_count_distinct() {
-        let (sql, params) = transpile(Statement::Select(
-            SelectStatement::new(TableRef::new("events"))
-                .projections(vec![Projection::Aggregate(AggregateFunction::ApproxCountDistinct("user_id".into()))]),
+        let (sql, params) = transpile(Statement::select(
+            SelectStatement::new("events")
+                .projections([Projection::aggregate(AggregateFunction::approx_count_distinct("user_id"))]),
         ));
         assert_eq!(sql, "SELECT uniqHLL12(user_id) FROM events");
         assert!(params.is_empty());
@@ -618,12 +618,12 @@ mod tests {
 
     #[test]
     fn test_select_aggregate_state_and_merge() {
-        let (sql, params) = transpile(Statement::Select(
-            SelectStatement::new(TableRef::new("events"))
-                .projections(vec![
-                    Projection::Aggregate(AggregateFunction::State(Box::new(AggregateFunction::Count(CountArg::All)))),
-                    Projection::Aggregate(AggregateFunction::State(Box::new(AggregateFunction::Avg("duration_ms".into())))),
-                    Projection::Aggregate(AggregateFunction::State(Box::new(AggregateFunction::Quantile { level: 0.95, column: "duration_ms".into() }))),
+        let (sql, params) = transpile(Statement::select(
+            SelectStatement::new("events")
+                .projections([
+                    Projection::aggregate(AggregateFunction::state(AggregateFunction::count_all())),
+                    Projection::aggregate(AggregateFunction::state(AggregateFunction::avg("duration_ms"))),
+                    Projection::aggregate(AggregateFunction::state(AggregateFunction::quantile(0.95, "duration_ms"))),
                 ]),
         ));
         assert_eq!(sql, "SELECT countState(*), avgState(duration_ms), quantileState(0.95)(duration_ms) FROM events");
@@ -632,11 +632,11 @@ mod tests {
 
     #[test]
     fn test_select_aggregate_merge() {
-        let (sql, params) = transpile(Statement::Select(
-            SelectStatement::new(TableRef::new("events_by_minute"))
-                .projections(vec![
-                    Projection::Aggregate(AggregateFunction::Merge(Box::new(AggregateFunction::Count(CountArg::All)))),
-                    Projection::Aggregate(AggregateFunction::Merge(Box::new(AggregateFunction::Quantile { level: 0.95, column: "duration_ms".into() }))),
+        let (sql, params) = transpile(Statement::select(
+            SelectStatement::new("events_by_minute")
+                .projections([
+                    Projection::aggregate(AggregateFunction::merge(AggregateFunction::count_all())),
+                    Projection::aggregate(AggregateFunction::merge(AggregateFunction::quantile(0.95, "duration_ms"))),
                 ]),
         ));
         assert_eq!(sql, "SELECT countMerge(*), quantileMerge(0.95)(duration_ms) FROM events_by_minute");
@@ -645,9 +645,9 @@ mod tests {
 
     #[test]
     fn test_select_quantile() {
-        let (sql, params) = transpile(Statement::Select(
-            SelectStatement::new(TableRef::new("events"))
-                .projections(vec![Projection::Aggregate(AggregateFunction::Quantile { level: 0.99, column: "latency".into() })]),
+        let (sql, params) = transpile(Statement::select(
+            SelectStatement::new("events")
+                .projections([Projection::aggregate(AggregateFunction::quantile(0.99, "latency"))]),
         ));
         assert_eq!(sql, "SELECT quantile(0.99)(latency) FROM events");
         assert!(params.is_empty());
@@ -655,10 +655,10 @@ mod tests {
 
     #[test]
     fn test_insert_single_row() {
-        let (sql, params) = transpile(Statement::Insert(
-            InsertStatement::new(TableRef::new("events"))
-                .columns(vec!["id".into(), "name".into()])
-                .values(vec![vec![Value::Int64(1), Value::String("foo".into())]]),
+        let (sql, params) = transpile(Statement::insert(
+            InsertStatement::new("events")
+                .columns(["id", "name"])
+                .values([[Value::Int64(1), Value::String("foo".into())]]),
         ));
         assert_eq!(sql, "INSERT INTO events (id, name) VALUES (?, ?)");
         assert_eq!(params, vec![Value::Int64(1), Value::String("foo".into())]);
@@ -666,10 +666,10 @@ mod tests {
 
     #[test]
     fn test_insert_multiple_rows() {
-        let (sql, params) = transpile(Statement::Insert(
-            InsertStatement::new(TableRef::new("events"))
-                .columns(vec!["id".into(), "name".into()])
-                .values(vec![
+        let (sql, params) = transpile(Statement::insert(
+            InsertStatement::new("events")
+                .columns(["id", "name"])
+                .values([
                     vec![Value::Int64(1), Value::String("a".into())],
                     vec![Value::Int64(2), Value::String("b".into())],
                 ]),
@@ -685,9 +685,9 @@ mod tests {
 
     #[test]
     fn test_update_emits_alter_table() {
-        let (sql, params) = transpile(Statement::Update(
-            UpdateStatement::new(TableRef::new("events"))
-                .set(vec![("count".into(), Value::Int32(99))])
+        let (sql, params) = transpile(Statement::update(
+            UpdateStatement::new("events")
+                .set([("count", Value::Int32(99))])
                 .where_clause(ConditionExpression::eq("id", 1i64)),
         ));
         assert_eq!(sql, "ALTER TABLE events UPDATE count = ? WHERE id = ?");
@@ -696,8 +696,8 @@ mod tests {
 
     #[test]
     fn test_delete_emits_alter_table() {
-        let (sql, params) = transpile(Statement::Delete(
-            DeleteStatement::new(TableRef::new("events"))
+        let (sql, params) = transpile(Statement::delete(
+            DeleteStatement::new("events")
                 .where_clause(ConditionExpression::eq("id", 1i64)),
         ));
         assert_eq!(sql, "ALTER TABLE events DELETE WHERE id = ?");
@@ -706,16 +706,16 @@ mod tests {
 
     #[test]
     fn test_delete_all() {
-        let (sql, params) = transpile(Statement::Delete(DeleteStatement::new(TableRef::new("events"))));
+        let (sql, params) = transpile(Statement::delete(DeleteStatement::new("events")));
         assert_eq!(sql, "ALTER TABLE events DELETE WHERE 1");
         assert!(params.is_empty());
     }
 
     #[test]
     fn test_create_table_with_engine_options() {
-        let (sql, params) = transpile(Statement::CreateTable(
+        let (sql, params) = transpile(Statement::create_table(
             CreateTableStatement::new("events")
-                .columns(vec![col("id", ColumnType::UInt64)])
+                .columns([col("id", ColumnType::UInt64)])
                 .option("engine", "MergeTree()")
                 .option("order_by", "id"),
         ));
@@ -725,10 +725,10 @@ mod tests {
 
     #[test]
     fn test_create_table_low_cardinality_and_datetime64() {
-        let (sql, params) = transpile(Statement::CreateTable(
+        let (sql, params) = transpile(Statement::create_table(
             CreateTableStatement::new("events")
-                .columns(vec![
-                    col("event_time", ColumnType::DateTime64 { precision: 3 }),
+                .columns([
+                    col("event_time", ColumnType::datetime64(3)),
                     col("event_type", ColumnType::LowCardinalityString),
                 ]),
         ));
@@ -738,12 +738,12 @@ mod tests {
 
     #[test]
     fn test_create_table_aggregate_state_column() {
-        let (sql, params) = transpile(Statement::CreateTable(
+        let (sql, params) = transpile(Statement::create_table(
             CreateTableStatement::new("events_by_minute")
-                .columns(vec![
-                    col("count", ColumnType::AggregateState(AggregateStateFunction::new(AggregateFn::Count, vec![ColumnType::UInt64]))),
-                    col("duration_ms_avg", ColumnType::AggregateState(AggregateStateFunction::new(AggregateFn::Avg, vec![ColumnType::UInt32]))),
-                    col("duration_ms_p95", ColumnType::AggregateState(AggregateStateFunction::new(AggregateFn::Quantile(0.95), vec![ColumnType::UInt32]))),
+                .columns([
+                    col("count", ColumnType::aggregate_state(AggregateFn::count(), [ColumnType::UInt64])),
+                    col("duration_ms_avg", ColumnType::aggregate_state(AggregateFn::avg(), [ColumnType::UInt32])),
+                    col("duration_ms_p95", ColumnType::aggregate_state(AggregateFn::quantile(0.95), [ColumnType::UInt32])),
                 ]),
         ));
         assert_eq!(
@@ -755,10 +755,10 @@ mod tests {
 
     #[test]
     fn test_create_table_if_not_exists_nullable() {
-        let (sql, params) = transpile(Statement::CreateTable(
+        let (sql, params) = transpile(Statement::create_table(
             CreateTableStatement::new("events")
                 .if_not_exists()
-                .columns(vec![col_nullable("ts", ColumnType::DateTime64 { precision: 3 })]),
+                .columns([col_nullable("ts", ColumnType::datetime64(3))]),
         ));
         assert_eq!(sql, "CREATE TABLE IF NOT EXISTS events (ts Nullable(DateTime64(3)))");
         assert!(params.is_empty());
@@ -766,12 +766,12 @@ mod tests {
 
     #[test]
     fn test_create_table_with_ttl() {
-        let (sql, params) = transpile(Statement::CreateTable(
+        let (sql, params) = transpile(Statement::create_table(
             CreateTableStatement::new("events")
-                .columns(vec![col("event_time", ColumnType::DateTime64 { precision: 3 })])
+                .columns([col("event_time", ColumnType::datetime64(3))])
                 .option("engine", "MergeTree()")
                 .option("order_by", "event_time")
-                .ttl(TtlClause::delete("event_time", Interval::new(90, IntervalUnit::Day))),
+                .ttl(TtlClause::delete("event_time", Interval::days(90))),
         ));
         assert_eq!(sql, "CREATE TABLE events (event_time DateTime64(3)) ENGINE = MergeTree() ORDER BY event_time TTL event_time + INTERVAL 90 DAY");
         assert!(params.is_empty());
@@ -779,10 +779,10 @@ mod tests {
 
     #[test]
     fn test_alter_table_add_drop_columns() {
-        let (sql, params) = transpile(Statement::AlterTable(
+        let (sql, params) = transpile(Statement::alter_table(
             AlterTableStatement::new("events")
-                .add_columns(vec![col("severity", ColumnType::UInt8)])
-                .drop_columns(vec!["old_col".into()]),
+                .add_columns([col("severity", ColumnType::UInt8)])
+                .drop_columns(["old_col"]),
         ));
         assert_eq!(sql, "ALTER TABLE events ADD COLUMN severity UInt8, DROP COLUMN old_col");
         assert!(params.is_empty());
@@ -790,9 +790,9 @@ mod tests {
 
     #[test]
     fn test_alter_table_modify_ttl() {
-        let (sql, params) = transpile(Statement::AlterTable(
+        let (sql, params) = transpile(Statement::alter_table(
             AlterTableStatement::new("events")
-                .ttl(TtlClause::delete("event_time", Interval::new(30, IntervalUnit::Day))),
+                .ttl(TtlClause::delete("event_time", Interval::days(30))),
         ));
         assert_eq!(sql, "ALTER TABLE events  MODIFY TTL event_time + INTERVAL 30 DAY");
         assert!(params.is_empty());
@@ -800,7 +800,7 @@ mod tests {
 
     #[test]
     fn test_drop_table_if_exists() {
-        let (sql, params) = transpile(Statement::DropTable(
+        let (sql, params) = transpile(Statement::drop_table(
             DropTableStatement::new("events").if_exists(),
         ));
         assert_eq!(sql, "DROP TABLE IF EXISTS events");
@@ -809,10 +809,10 @@ mod tests {
 
     #[test]
     fn test_create_view_inlines_values() {
-        let (sql, params) = transpile(Statement::CreateView(
+        let (sql, params) = transpile(Statement::create_view(
             CreateViewStatement::new(
                 "high_severity",
-                SelectStatement::new(TableRef::new("events"))
+                SelectStatement::new("events")
                     .where_clause(ConditionExpression::gte("severity", 3i32)),
             ),
         ));
@@ -822,12 +822,9 @@ mod tests {
 
     #[test]
     fn test_create_view_or_replace() {
-        let (sql, params) = transpile(Statement::CreateView(
-            CreateViewStatement::new(
-                "high_severity",
-                SelectStatement::new(TableRef::new("events")),
-            )
-            .or_replace(),
+        let (sql, params) = transpile(Statement::create_view(
+            CreateViewStatement::new("high_severity", SelectStatement::new("events"))
+                .or_replace(),
         ));
         assert_eq!(sql, "CREATE OR REPLACE VIEW high_severity AS SELECT * FROM events");
         assert!(params.is_empty());
@@ -835,10 +832,10 @@ mod tests {
 
     #[test]
     fn test_create_materialized_view_to_table() {
-        let (sql, params) = transpile(Statement::CreateMaterializedView(
+        let (sql, params) = transpile(Statement::create_materialized_view(
             CreateMaterializedViewStatement::new(
                 "high_severity_mv",
-                SelectStatement::new(TableRef::new("events"))
+                SelectStatement::new("events")
                     .where_clause(ConditionExpression::gte("severity", 3i32)),
             )
             .to_table("high_severity_local")
@@ -854,7 +851,7 @@ mod tests {
 
     #[test]
     fn test_drop_view() {
-        let (sql, params) = transpile(Statement::DropView(
+        let (sql, params) = transpile(Statement::drop_view(
             DropViewStatement::new("high_severity").if_exists(),
         ));
         assert_eq!(sql, "DROP VIEW IF EXISTS high_severity");
@@ -863,7 +860,7 @@ mod tests {
 
     #[test]
     fn test_drop_materialized_view_emits_drop_table() {
-        let (sql, params) = transpile(Statement::DropView(
+        let (sql, params) = transpile(Statement::drop_view(
             DropViewStatement::new("high_severity_mv").materialized(),
         ));
         assert_eq!(sql, "DROP TABLE high_severity_mv");
@@ -872,8 +869,8 @@ mod tests {
 
     #[test]
     fn test_condition_and() {
-        let (sql, params) = transpile(Statement::Select(
-            SelectStatement::new(TableRef::new("events")).where_clause(
+        let (sql, params) = transpile(Statement::select(
+            SelectStatement::new("events").where_clause(
                 ConditionExpression::eq("id", 1i64).and(ConditionExpression::eq("count", 6i32)),
             ),
         ));
@@ -884,20 +881,17 @@ mod tests {
     #[test]
     fn test_insert_empty_returns_error() {
         let mut t = Transpiler::new();
-        let result = t.transpile(&Statement::Insert(
-            InsertStatement::new(TableRef::new("events"))
-                .columns(vec!["id".into()])
-                .values(vec![]),
+        let result = t.transpile(&Statement::insert(
+            InsertStatement::new("events")
+                .columns(["id"])
+                .values(Vec::<Vec<Value>>::new()),
         ));
         assert!(result.is_err());
     }
 
     #[test]
     fn test_raw_passthrough() {
-        let (sql, params) = transpile(Statement::Raw(
-            "SELECT 1".into(),
-            vec![Value::Int32(1)],
-        ));
+        let (sql, params) = transpile(Statement::raw("SELECT 1", [Value::Int32(1)]));
         assert_eq!(sql, "SELECT 1");
         assert_eq!(params, vec![Value::Int32(1)]);
     }

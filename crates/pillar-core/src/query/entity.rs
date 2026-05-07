@@ -51,8 +51,7 @@ impl<M: Model> SelectEntity<M> {
             .projections(
                 columns
                     .into_iter()
-                    .map(|column| Projection::Column(column.into_column_ref()))
-                    .collect()
+                    .map(|column| Projection::Column(column.into_column_ref())),
             );
         self
     }
@@ -135,8 +134,7 @@ impl<M: Model> SelectEntity<M> {
         self.statement = self.statement.group_by(
             columns
                 .into_iter()
-                .map(|column| column.into_column_ref())
-                .collect()
+                .map(|column| column.into_column_ref()),
         );
         self
     }
@@ -289,11 +287,12 @@ impl<M: Model> InsertEntity<M> {
                 .columns(
                     M::columns()
                         .iter()
-                        .map(|col| col.name.to_string())
-                        .collect()
+                        .map(|col| col.name.to_string()),
                 )
                 .values(
-                    models.iter().map(|m| m.to_row()).collect()
+                    models
+                        .iter()
+                        .map(|m| m.to_row()),
                 ),
             _marker: std::marker::PhantomData,
         })
@@ -501,8 +500,7 @@ pub trait TableSchema: Model {
                 .columns(
                     Self::columns()
                         .iter()
-                        .map(ColumnDefinition::from)
-                        .collect(),
+                        .map(ColumnDefinition::from),
                 ),
         )
     }
