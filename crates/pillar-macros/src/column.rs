@@ -40,7 +40,14 @@ fn column_def(field: &FieldAttrs) -> syn::Result<TokenStream> {
         .map(str::to_owned)
         .unwrap_or_else(|| field.ident.as_ref().unwrap().to_string());
 
-    let info = column_info(&field.ty)?;
+    let info = if let Some(raw) = &field.column_type {
+        ColumnInfo {
+            column_type: quote! { ::pillar::ast::ColumnType::Custom(#raw.to_string()) },
+            nullable: unwrap_option(&field.ty).is_some(),
+        }
+    } else {
+        column_info(&field.ty)?
+    };
     let column_type = info.column_type;
     let nullable = info.nullable;
     let primary_key = field.primary_key;
@@ -115,23 +122,23 @@ fn path_to_column_type(path: &syn::Path) -> syn::Result<TokenStream> {
     let segment = path.segments.last().unwrap();
 
     match segment.ident.to_string().as_str() {
-        "bool"      => Ok(quote! { ::pillar::column::ColumnType::Boolean }),
-        "i8"        => Ok(quote! { ::pillar::column::ColumnType::Int8 }),
-        "i16"       => Ok(quote! { ::pillar::column::ColumnType::Int16 }),
-        "i32"       => Ok(quote! { ::pillar::column::ColumnType::Int32 }),
-        "i64"       => Ok(quote! { ::pillar::column::ColumnType::Int64 }),
-        "u8"        => Ok(quote! { ::pillar::column::ColumnType::UInt8 }),
-        "u16"       => Ok(quote! { ::pillar::column::ColumnType::UInt16 }),
-        "u32"       => Ok(quote! { ::pillar::column::ColumnType::UInt32 }),
-        "u64"       => Ok(quote! { ::pillar::column::ColumnType::UInt64 }),
-        "f32"       => Ok(quote! { ::pillar::column::ColumnType::Float32 }),
-        "f64"       => Ok(quote! { ::pillar::column::ColumnType::Float64 }),
-        "String"    => Ok(quote! { ::pillar::column::ColumnType::String }),
-        "Vec"       => vec_to_column_type(path),
-        "NaiveDate" => Ok(quote! { ::pillar::column::ColumnType::Date }),
-        "NaiveTime" => Ok(quote! { ::pillar::column::ColumnType::Time }),
-        "DateTime"  => Ok(quote! { ::pillar::column::ColumnType::DateTime }),
-        "Uuid"      => Ok(quote! { ::pillar::column::ColumnType::Uuid }),
+        "bool" => Ok(quote! { ::pillar::ast::ColumnType::Boolean }),
+        "i8" => Ok(quote! { ::pillar::ast::ColumnType::Int8 }),
+        "i16" => Ok(quote! { ::pillar::ast::ColumnType::Int16 }),
+        "i32" => Ok(quote! { ::pillar::ast::ColumnType::Int32 }),
+        "i64" => Ok(quote! { ::pillar::ast::ColumnType::Int64 }),
+        "u8" => Ok(quote! { ::pillar::ast::ColumnType::UInt8 }),
+        "u16" => Ok(quote! { ::pillar::ast::ColumnType::UInt16 }),
+        "u32" => Ok(quote! { ::pillar::ast::ColumnType::UInt32 }),
+        "u64" => Ok(quote! { ::pillar::ast::ColumnType::UInt64 }),
+        "f32" => Ok(quote! { ::pillar::ast::ColumnType::Float32 }),
+        "f64" => Ok(quote! { ::pillar::ast::ColumnType::Float64 }),
+        "String" => Ok(quote! { ::pillar::ast::ColumnType::String }),
+        "Vec" => vec_to_column_type(path),
+        "NaiveDate" => Ok(quote! { ::pillar::ast::ColumnType::Date }),
+        "NaiveTime" => Ok(quote! { ::pillar::ast::ColumnType::Time }),
+        "DateTime" => Ok(quote! { ::pillar::ast::ColumnType::DateTime }),
+        "Uuid" => Ok(quote! { ::pillar::ast::ColumnType::Uuid }),
         _ => Err(syn::Error::new_spanned(
             path,
             format!(
@@ -151,7 +158,7 @@ fn vec_to_column_type(path: &syn::Path) -> syn::Result<TokenStream> {
         Some(syn::GenericArgument::Type(syn::Type::Path(inner)))
             if inner.path.is_ident("u8") =>
         {
-            Ok(quote! { ::pillar::column::ColumnType::Binary })
+            Ok(quote! { ::pillar::ast::ColumnType::Binary })
         }
         _ => Err(syn::Error::new_spanned(
             path,

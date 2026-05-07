@@ -47,6 +47,8 @@ pub enum ColumnType {
     AggregateState(AggregateStateFunction),
     /// Explicit nullable wrapper for backends that require it in the type position.
     Nullable(Box<ColumnType>),
+    /// A raw type string passed through to the backend as-is.
+    Custom(String),
 }
 
 /// The aggregate function and argument types stored in an [`AggregateState`](crate::ast::ColumnType::AggregateState) column.

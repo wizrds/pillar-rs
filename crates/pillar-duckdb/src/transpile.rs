@@ -326,6 +326,7 @@ impl Transpiler {
                 }
             }
             ColumnType::Nullable(inner) => self.column_type(inner),
+            ColumnType::Custom(s) => s.clone(),
         }
     }
 

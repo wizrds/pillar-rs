@@ -356,6 +356,7 @@ impl Transpiler {
                 format!("AggregateFunction({fn_name}, {arg_types})")
             }
             ColumnType::Nullable(inner) => format!("Nullable({})", self.column_type(inner)),
+            ColumnType::Custom(s) => s.clone(),
         }
     }
 

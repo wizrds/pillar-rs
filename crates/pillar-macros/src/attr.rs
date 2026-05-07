@@ -25,6 +25,7 @@ pub struct FieldAttrs {
     pub ident: Option<syn::Ident>,
     pub ty: syn::Type,
     pub column: Option<String>,
+    pub column_type: Option<String>,
 
     #[darling(default)]
     pub primary_key: bool,

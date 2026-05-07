@@ -1,4 +1,9 @@
-use crate::{value::Value, condition::ConditionExpression, ast::schema::ColumnType};
+use crate::{
+    value::Value,
+    condition::ConditionExpression,
+    ast::schema::ColumnType
+};
+
 
 /// Compile-time metadata for a single column on a [`Model`](crate::model::Model) or [`MaterializedView`](crate::view::MaterializedView).
 #[derive(Debug, Clone)]
