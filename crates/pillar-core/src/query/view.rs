@@ -57,12 +57,17 @@ impl<V: MaterializedView> SelectView<V> {
     }
 
     pub fn order_by_asc<C: IntoColumnRef>(mut self, column: C) -> Self {
-        self.statement = self.statement.order_by_column(OrderBy::asc(column.into_column_ref()));
+        self.statement = self.statement.order_by(OrderBy::asc(column.into_column_ref()));
         self
     }
 
     pub fn order_by_desc<C: IntoColumnRef>(mut self, column: C) -> Self {
-        self.statement = self.statement.order_by_column(OrderBy::desc(column.into_column_ref()));
+        self.statement = self.statement.order_by(OrderBy::desc(column.into_column_ref()));
+        self
+    }
+
+    pub fn order_by(mut self, order_by: OrderBy) -> Self {
+        self.statement = self.statement.order_by(order_by);
         self
     }
 

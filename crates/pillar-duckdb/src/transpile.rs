@@ -4,9 +4,8 @@ use pillar_core::{
         CreateMaterializedViewStatement, CreateTableStatement, CreateViewStatement,
         DeleteStatement, DropTableStatement, DropViewStatement, Expression, InsertStatement,
         JoinType, NullsOrder, OnConflictAction, OrderDirection, Projection, SelectStatement,
-        Statement, UpdateStatement,
+        Statement, UpdateStatement, AggregateFn, ColumnType,
     },
-    column::{AggregateFn, ColumnType},
     condition::ConditionExpression,
     errors::Error,
     dialect::PreparedStatement,
@@ -433,7 +432,7 @@ impl Transpiler {
         }
     }
 
-    pub(crate) fn transpile(&mut self, statement: &Statement) -> Result<String, Error> {
+    pub fn transpile(&mut self, statement: &Statement) -> Result<String, Error> {
         match statement {
             Statement::Select(s) => self.select(s, false),
             Statement::Insert(s) => self.insert(s),
@@ -452,14 +451,14 @@ impl Transpiler {
         }
     }
 
-    pub(crate) fn finish(self, sql: String) -> PreparedStatement {
+    pub fn finish(self, sql: String) -> PreparedStatement {
         PreparedStatement {
             sql,
             params: self.params,
         }
     }
 
-    pub(crate) fn condition(&mut self, expr: &ConditionExpression, inline: bool) -> String {
+    pub fn condition(&mut self, expr: &ConditionExpression, inline: bool) -> String {
         match expr {
             ConditionExpression::Eq(col, val) => {
                 format!("{col} = {}", self.placeholder(val.clone(), inline))
@@ -546,8 +545,8 @@ mod tests {
             AggregateFunction, AlterTableStatement, ColumnDefinition, CountArg,
             CreateTableStatement, DeleteStatement, InsertStatement, Interval, IntervalUnit,
             Projection, SelectStatement, Statement, TableRef, TtlClause, UpdateStatement,
+            AggregateFn, AggregateStateFunction, ColumnType
         },
-        column::{AggregateFn, AggregateStateFunction, ColumnType},
         condition::ConditionExpression,
         value::Value,
     };

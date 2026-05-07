@@ -1,20 +1,14 @@
+pub mod table;
 pub mod mutation;
 pub mod schema;
 pub mod select;
 pub mod ttl;
 
-pub use mutation::{
-    DeleteStatement, InsertStatement, OnConflict, OnConflictAction, UpdateStatement,
-};
-pub use schema::{
-    AlterTableStatement, ColumnDefinition, CreateMaterializedViewStatement, CreateTableStatement,
-    CreateViewStatement, DropTableStatement, DropViewStatement,
-};
-pub use select::{
-    AggregateFunction, BinaryOperator, CountArg, Expression, Join, JoinType, NullsOrder, OrderBy,
-    OrderDirection, Projection, SelectStatement, TableRef,
-};
-pub use ttl::{Interval, IntervalUnit, TtlAction, TtlClause};
+pub use table::*;
+pub use mutation::*;
+pub use schema::*;
+pub use select::*;
+pub use ttl::*;
 
 use crate::value::Value;
 

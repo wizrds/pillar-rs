@@ -1,6 +1,8 @@
-use crate::{condition::ConditionExpression, value::Value};
-
-use super::select::TableRef;
+use crate::{
+    condition::ConditionExpression,
+    value::Value,
+    ast::table::TableRef,
+};
 
 
 #[derive(Debug, Clone, PartialEq)]

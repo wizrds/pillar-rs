@@ -1,22 +1,9 @@
-use crate::{condition::ConditionExpression, value::Value};
+use crate::{
+    condition::ConditionExpression,
+    value::Value,
+    ast::table::TableRef,
+};
 
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct TableRef {
-    pub name: String,
-    pub alias: Option<String>,
-}
-
-impl TableRef {
-    pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into(), alias: None }
-    }
-
-    pub fn alias(mut self, alias: impl Into<String>) -> Self {
-        self.alias = Some(alias.into());
-        self
-    }
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Projection {
@@ -191,12 +178,12 @@ impl SelectStatement {
         self
     }
 
-    pub fn order_by(mut self, order_by: Vec<OrderBy>) -> Self {
+    pub fn set_order_by(mut self, order_by: Vec<OrderBy>) -> Self {
         self.order_by = order_by;
         self
     }
 
-    pub fn order_by_column(mut self, order_by: OrderBy) -> Self {
+    pub fn order_by(mut self, order_by: OrderBy) -> Self {
         self.order_by.push(order_by);
         self
     }

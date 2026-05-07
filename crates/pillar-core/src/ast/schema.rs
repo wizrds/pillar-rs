@@ -1,9 +1,81 @@
 use std::collections::HashMap;
 
-use crate::{column::ColumnType, value::Value};
+use crate::{
+    value::Value,
+    ast::{
+        select::SelectStatement,
+        ttl::TtlClause,
+    }
+};
 
-use super::{select::SelectStatement, ttl::TtlClause};
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum ColumnType {
+    Boolean,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    UInt8,
+    UInt16,
+    UInt32,
+    UInt64,
+    Float32,
+    Float64,
+    String,
+    Binary,
+    List(Box<ColumnType>),
+    Map(Box<ColumnType>, Box<ColumnType>),
+    #[cfg(feature = "chrono")]
+    Date,
+    #[cfg(feature = "chrono")]
+    Time,
+    #[cfg(feature = "chrono")]
+    DateTime,
+    #[cfg(feature = "uuid")]
+    Uuid,
+
+    /// High-precision timestamp with sub-second digits (0–9).
+    DateTime64 { precision: u8 },
+
+    /// String optimized for low-cardinality data (enums, status codes, hostnames).
+    LowCardinalityString,
+
+    /// Fixed-length string of exactly n bytes.
+    FixedString(u32),
+
+    /// Stores intermediate aggregate state for incremental rollup tables.
+    AggregateState(AggregateStateFunction),
+
+    /// Explicit nullable wrapper for backends that require it in the type position.
+    Nullable(Box<ColumnType>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AggregateStateFunction {
+    pub function: AggregateFn,
+    pub arg_types: Vec<ColumnType>,
+}
+
+impl AggregateStateFunction {
+    pub fn new(function: AggregateFn, arg_types: Vec<ColumnType>) -> Self {
+        Self { function, arg_types }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum AggregateFn {
+    Count,
+    Sum,
+    Avg,
+    Min,
+    Max,
+    Uniq,
+    Quantile(f64),
+    TopK(u32),
+    Histogram(u32),
+    Custom(String),
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ColumnDefinition {
@@ -12,6 +84,33 @@ pub struct ColumnDefinition {
     pub nullable: bool,
     pub primary_key: bool,
     pub default: Option<Value>,
+}
+
+impl ColumnDefinition {
+    pub fn new(name: impl Into<String>, data_type: ColumnType) -> Self {
+        Self {
+            name: name.into(),
+            data_type,
+            nullable: false,
+            primary_key: false,
+            default: None,
+        }
+    }
+
+    pub fn nullable(mut self) -> Self {
+        self.nullable = true;
+        self
+    }
+
+    pub fn primary_key(mut self) -> Self {
+        self.primary_key = true;
+        self
+    }
+
+    pub fn default(mut self, value: impl Into<Value>) -> Self {
+        self.default = Some(value.into());
+        self
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
