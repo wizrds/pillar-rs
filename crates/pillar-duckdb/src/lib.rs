@@ -1,3 +1,5 @@
+//! DuckDB backend for the pillar query framework.
+
 #[allow(unused_extern_crates)]
 extern crate self as pillar_duckdb;
 

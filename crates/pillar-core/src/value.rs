@@ -1,10 +1,13 @@
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
 
+/// Converts a value to its SQL literal representation.
 pub trait ToSql {
+    /// Returns the SQL literal string for this value.
     fn to_sql(&self) -> String;
 }
 
+/// A runtime value that can be passed as a query parameter or stored as a column default.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Null,
@@ -34,6 +37,7 @@ pub enum Value {
 }
 
 impl Value {
+    /// Returns `true` if this value is [`Value::Null`](crate::value::Value::Null).
     pub fn is_null(&self) -> bool {
         matches!(self, Value::Null)
     }
@@ -150,4 +154,3 @@ impl ToSql for chrono::NaiveTime { fn to_sql(&self) -> String { Value::Time(*sel
 impl ToSql for chrono::DateTime<chrono::Utc> { fn to_sql(&self) -> String { Value::DateTime(*self).to_sql() } }
 #[cfg(feature = "uuid")]
 impl ToSql for uuid::Uuid { fn to_sql(&self) -> String { Value::Uuid(*self).to_sql() } }
-

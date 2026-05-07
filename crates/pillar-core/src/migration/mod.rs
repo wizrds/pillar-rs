@@ -15,12 +15,14 @@ use async_trait::async_trait;
 use crate::{database::{AsDynDatabase, Database}, errors::Error};
 
 
+/// Runs migrations for a given [`Migrations`](crate::migration::Migrations) collection against a database.
 pub struct MigrationRunner<M: Migrations> {
     chain: RevisionChain,
     _marker: std::marker::PhantomData<M>,
 }
 
 impl<M: Migrations> MigrationRunner<M> {
+    /// Creates a new [`MigrationRunner`](crate::migration::MigrationRunner) for the given migration collection.
     pub fn new() -> Self {
         Self {
             chain: RevisionChain::new(M::migrations()),
@@ -28,6 +30,7 @@ impl<M: Migrations> MigrationRunner<M> {
         }
     }
 
+    /// Applies all migrations up to the latest revision.
     pub async fn upgrade(&self, db: &dyn Database) -> Result<(), Error> {
         self.upgrade_to(
             db,
@@ -38,6 +41,7 @@ impl<M: Migrations> MigrationRunner<M> {
         .await
     }
 
+    /// Reverts all migrations down to the earliest revision.
     pub async fn downgrade(&self, db: &dyn Database) -> Result<(), Error> {
         self.downgrade_to(
             db,
@@ -48,10 +52,12 @@ impl<M: Migrations> MigrationRunner<M> {
         .await
     }
 
+    /// Applies migrations up to the given target revision ID.
     pub async fn upgrade_to(&self, db: &dyn Database, target: &str) -> Result<(), Error> {
         self.apply(db, target, MigrationDirection::Up).await
     }
 
+    /// Reverts migrations down to the given target revision ID.
     pub async fn downgrade_to(&self, db: &dyn Database, target: &str) -> Result<(), Error> {
         self.apply(db, target, MigrationDirection::Down).await
     }

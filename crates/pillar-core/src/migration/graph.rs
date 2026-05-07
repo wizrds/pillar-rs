@@ -3,12 +3,16 @@ use std::collections::{HashMap, HashSet};
 use crate::migration::traits::MigrationRef;
 
 
+/// A directed graph of migration revision relationships.
 pub struct RevisionGraph {
+    /// Maps each revision ID to the IDs of its child revisions.
     pub children: HashMap<String, Vec<String>>,
+    /// Maps each revision ID to its parent revision ID.
     pub parents: HashMap<String, String>,
 }
 
 impl RevisionGraph {
+    /// Builds a [`RevisionGraph`](crate::migration::RevisionGraph) from a slice of migration references.
     pub fn new(migrations: &[&MigrationRef]) -> Self {
         let mut children: HashMap<String, Vec<String>> = HashMap::new();
         let mut parents: HashMap<String, String> = HashMap::new();
@@ -55,6 +59,7 @@ impl RevisionGraph {
         None
     }
 
+    /// Returns the ordered revision IDs along the upgrade path from `from` to `to`, or `None` if no path exists.
     pub fn find_up_path(&self, from: &str, to: &str) -> Option<Vec<String>> {
         self.find_path(from, to, |graph, node| {
             graph.children
@@ -64,6 +69,7 @@ impl RevisionGraph {
         })
     }
 
+    /// Returns the ordered revision IDs along the downgrade path from `from` to `to`, or `None` if no path exists.
     pub fn find_down_path(&self, from: &str, to: &str) -> Option<Vec<String>> {
         self.find_path(from, to, |graph, node| {
             graph.parents
@@ -75,6 +81,7 @@ impl RevisionGraph {
 }
 
 
+/// An ordered chain of migrations with graph-based path resolution.
 pub struct RevisionChain {
     revisions: HashMap<String, MigrationRef>,
     graph: RevisionGraph,
@@ -83,6 +90,7 @@ pub struct RevisionChain {
 }
 
 impl RevisionChain {
+    /// Builds a [`RevisionChain`](crate::migration::RevisionChain) from a list of migration references.
     pub fn new(migrations: Vec<MigrationRef>) -> Self {
         let revisions: HashMap<String, MigrationRef> = migrations
             .into_iter()
@@ -104,24 +112,29 @@ impl RevisionChain {
         Self { revisions, graph, head, tail }
     }
 
+    /// Returns the migration with the given ID, if it exists.
     pub fn get(&self, id: &str) -> Option<&MigrationRef> {
         self.revisions.get(id)
     }
 
+    /// Returns the ID of the latest migration in the chain.
     pub fn head(&self) -> Option<&str> {
         self.head.as_deref()
     }
 
+    /// Returns the ID of the earliest migration in the chain.
     pub fn tail(&self) -> Option<&str> {
         self.tail.as_deref()
     }
 
+    /// Returns the ordered migrations along the upgrade path from `from` to `to`.
     pub fn upgrade_path(&self, from: &str, to: &str) -> Option<Vec<&MigrationRef>> {
         self.graph
             .find_up_path(from, to)
             .map(|ids| ids.iter().filter_map(|id| self.get(id)).collect())
     }
 
+    /// Returns the ordered migrations along the downgrade path from `from` to `to`.
     pub fn downgrade_path(&self, from: &str, to: &str) -> Option<Vec<&MigrationRef>> {
         self.graph
             .find_down_path(from, to)

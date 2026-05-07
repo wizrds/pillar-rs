@@ -1,3 +1,9 @@
+//! Re-exports all public types, traits, and macros for convenient glob import.
+//!
+//! ```rust
+//! use pillar::prelude::*;
+//! ```
+
 pub use pillar_core::{
     ast::*,
     column::*,

@@ -12,19 +12,22 @@ use pillar_core::{
 use crate::{dialect::DuckDbDialect, value::DuckDbValue};
 
 
+/// A [`pillar_core::database::Database`](pillar_core::database::Database) implementation backed by DuckDB.
 pub struct DuckDbDatabase {
     conn: Arc<Mutex<duckdb::Connection>>,
     dialect: DuckDbDialect,
 }
 
 impl DuckDbDatabase {
-    pub(crate) fn from_connection(conn: duckdb::Connection) -> Self {
+    /// Creates a new [`DuckDbDatabase`](crate::database::DuckDbDatabase) from an existing DuckDB connection.
+    pub fn from_connection(conn: duckdb::Connection) -> Self {
         Self {
             conn: Arc::new(Mutex::new(conn)),
             dialect: DuckDbDialect,
         }
     }
 
+    /// Opens an in-memory DuckDB database.
     pub async fn in_memory() -> Result<Self, Error> {
         blocking::unblock(|| {
             duckdb::Connection::open_in_memory()
@@ -34,6 +37,7 @@ impl DuckDbDatabase {
         .await
     }
 
+    /// Opens a DuckDB database at the given file path.
     pub async fn open(path: impl AsRef<std::path::Path> + Send + 'static) -> Result<Self, Error> {
         blocking::unblock(|| {
             duckdb::Connection::open(path)

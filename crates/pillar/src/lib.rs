@@ -1,3 +1,8 @@
+//! Pillar is a database-agnostic query and schema framework for Rust.
+//!
+//! This crate re-exports everything from [`pillar_core`] and provides optional backend
+//! integrations and the [`prelude`] module for convenient glob imports.
+
 #[allow(unused_extern_crates)]
 extern crate self as pillar;
 

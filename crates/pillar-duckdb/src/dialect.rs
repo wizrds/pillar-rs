@@ -7,6 +7,7 @@ use pillar_core::{
 use crate::transpile::Transpiler;
 
 
+/// A [`pillar_core::dialect::Dialect`](pillar_core::dialect::Dialect) implementation for DuckDB.
 pub struct DuckDbDialect;
 
 impl Dialect for DuckDbDialect {

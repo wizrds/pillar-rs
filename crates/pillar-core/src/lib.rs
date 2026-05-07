@@ -1,3 +1,5 @@
+//! Core types, traits, and AST definitions for the pillar query framework.
+
 #[allow(unused_extern_crates)]
 extern crate self as pillar_core;
 

@@ -18,6 +18,7 @@ use crate::dialect::ClickHouseDialect;
 
 const CHUNK_SIZE: usize = 65536;
 
+/// A [`pillar_core::database::Database`](pillar_core::database::Database) implementation backed by ClickHouse.
 pub struct ClickHouseDatabase {
     client: clickhouse::Client,
     dialect: ClickHouseDialect,
@@ -98,7 +99,7 @@ impl Database for ClickHouseDatabase {
 
     async fn execute(&self, statement: &Statement) -> Result<ExecutionResult, Error> {
         let prepared = self.dialect.transpile(statement)?;
-        
+
         Self::bind_params(self.client.query(&prepared.sql), &prepared.params)
             .execute()
             .await
@@ -141,6 +142,7 @@ impl Database for ClickHouseDatabase {
     }
 }
 
+/// A builder for [`ClickHouseDatabase`](crate::database::ClickHouseDatabase).
 pub struct ClickHouseDatabaseBuilder {
     url: String,
     database: Option<String>,
@@ -149,6 +151,7 @@ pub struct ClickHouseDatabaseBuilder {
 }
 
 impl ClickHouseDatabaseBuilder {
+    /// Creates a new builder targeting the given server URL.
     pub fn new(url: impl Into<String>) -> Self {
         Self {
             url: url.into(),
@@ -158,21 +161,25 @@ impl ClickHouseDatabaseBuilder {
         }
     }
 
+    /// Sets the database name.
     pub fn database(mut self, database: impl Into<String>) -> Self {
         self.database = Some(database.into());
         self
     }
 
+    /// Sets the username.
     pub fn user(mut self, user: impl Into<String>) -> Self {
         self.user = Some(user.into());
         self
     }
 
+    /// Sets the password.
     pub fn password(mut self, password: impl Into<String>) -> Self {
         self.password = Some(password.into());
         self
     }
 
+    /// Builds the [`ClickHouseDatabase`](crate::database::ClickHouseDatabase).
     pub fn build(self) -> ClickHouseDatabase {
         let mut client = clickhouse::Client::default()
             .with_url(self.url);
