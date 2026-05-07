@@ -1,11 +1,18 @@
 use std::collections::HashMap;
+use std::sync::Arc;
+
+use arrow::datatypes::{DataType, Field};
+
+#[cfg(feature = "chrono")]
+use arrow::datatypes::TimeUnit;
 
 use crate::{
+    errors::Error,
     value::Value,
     ast::{
         select::SelectStatement,
         ttl::TtlClause,
-    }
+    },
 };
 
 
@@ -49,6 +56,61 @@ pub enum ColumnType {
     Nullable(Box<ColumnType>),
     /// A raw type string passed through to the backend as-is.
     Custom(String),
+}
+
+impl ColumnType {
+    /// Maps this column type to its Arrow [`DataType`](arrow::datatypes::DataType) equivalent.
+    ///
+    /// Returns an error for types that have no valid Arrow representation.
+    pub fn to_arrow_data_type(&self) -> Result<DataType, Error> {
+        match self {
+            ColumnType::Boolean => Ok(DataType::Boolean),
+            ColumnType::Int8 => Ok(DataType::Int8),
+            ColumnType::Int16 => Ok(DataType::Int16),
+            ColumnType::Int32 => Ok(DataType::Int32),
+            ColumnType::Int64 => Ok(DataType::Int64),
+            ColumnType::UInt8 => Ok(DataType::UInt8),
+            ColumnType::UInt16 => Ok(DataType::UInt16),
+            ColumnType::UInt32 => Ok(DataType::UInt32),
+            ColumnType::UInt64 => Ok(DataType::UInt64),
+            ColumnType::Float32 => Ok(DataType::Float32),
+            ColumnType::Float64 => Ok(DataType::Float64),
+            ColumnType::String | ColumnType::LowCardinalityString => Ok(DataType::LargeUtf8),
+            ColumnType::Binary => Ok(DataType::LargeBinary),
+            ColumnType::FixedString(n) => Ok(DataType::FixedSizeBinary(*n as i32)),
+            ColumnType::List(inner) => Ok(DataType::LargeList(Arc::new(
+                Field::new("item", inner.to_arrow_data_type()?, true),
+            ))),
+            ColumnType::Map(key, value) => Ok(DataType::Map(
+                Arc::new(Field::new(
+                    "entries",
+                    DataType::Struct(
+                        vec![
+                            Field::new("key", key.to_arrow_data_type()?, false),
+                            Field::new("value", value.to_arrow_data_type()?, true),
+                        ]
+                        .into(),
+                    ),
+                    false,
+                )),
+                false,
+            )),
+            #[cfg(feature = "chrono")]
+            ColumnType::Date => Ok(DataType::Date32),
+            #[cfg(feature = "chrono")]
+            ColumnType::Time => Ok(DataType::Time64(TimeUnit::Nanosecond)),
+            #[cfg(feature = "chrono")]
+            ColumnType::DateTime | ColumnType::DateTime64 { .. } => {
+                Ok(DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".into())))
+            }
+            #[cfg(feature = "uuid")]
+            ColumnType::Uuid => Ok(DataType::FixedSizeBinary(16)),
+            ColumnType::Nullable(inner) => inner.to_arrow_data_type(),
+            _ => Err(Error::serialization(
+                "column type has no Arrow equivalent",
+            )),
+        }
+    }
 }
 
 /// The aggregate function and argument types stored in an [`AggregateState`](crate::ast::ColumnType::AggregateState) column.

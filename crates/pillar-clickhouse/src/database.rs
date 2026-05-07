@@ -55,11 +55,12 @@ impl ClickHouseDatabase {
                 #[cfg(feature = "chrono")]
                 Value::Time(v) => query.bind(v.to_string()),
                 #[cfg(feature = "chrono")]
-                Value::DateTime(v) => query.bind(v),
+                Value::DateTime(v) => query.bind(v.format("%Y-%m-%d %H:%M:%S").to_string()),
                 #[cfg(feature = "uuid")]
                 Value::Uuid(v) => query.bind(v.to_string()),
             };
         }
+
         query
     }
 

@@ -69,12 +69,10 @@ fn model_struct(table_name: &str, fields: &[FieldAttrs]) -> syn::Result<TokenStr
                 rows: &[Self],
             ) -> ::std::result::Result<::pillar::__private::arrow::record_batch::RecordBatch, ::pillar::errors::Error> {
                 ::pillar::__private::serde_arrow::to_record_batch(
-                    &<::std::vec::Vec<::pillar::__private::arrow::datatypes::FieldRef>
-                        as ::pillar::__private::serde_arrow::schema::SchemaLike>::from_samples(
-                            &rows.iter().collect::<::std::vec::Vec<_>>(),
-                            ::pillar::__private::serde_arrow::schema::TracingOptions::default(),
-                        )
-                        .map_err(|e| ::pillar::errors::Error::serialization(e.to_string()))?,
+                    &Self::columns()
+                        .iter()
+                        .map(|col| col.to_arrow_field())
+                        .collect::<::std::result::Result<::std::vec::Vec<_>, _>>()?,
                     &rows.iter().collect::<::std::vec::Vec<_>>(),
                 )
                 .map_err(|e| ::pillar::errors::Error::serialization(e.to_string()))

@@ -1,4 +1,8 @@
+use std::sync::Arc;
+use arrow::datatypes::{Field, FieldRef};
+
 use crate::{
+    errors::Error,
     value::Value,
     condition::ConditionExpression,
     ast::schema::{ColumnDefinition, ColumnType},
@@ -14,6 +18,19 @@ pub struct ColumnDef {
     pub primary_key: bool,
     pub unique: bool,
     pub default: Option<Value>,
+}
+
+impl ColumnDef {
+    /// Converts this column definition into an Arrow [`Field`](arrow::datatypes::Field).
+    ///
+    /// Returns an error if the column type has no valid Arrow representation.
+    pub fn to_arrow_field(&self) -> Result<FieldRef, Error> {
+        Ok(Arc::new(Field::new(
+            self.name,
+            self.column_type.to_arrow_data_type()?,
+            self.nullable,
+        )))
+    }
 }
 
 impl From<&ColumnDef> for ColumnDefinition {
