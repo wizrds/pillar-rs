@@ -180,6 +180,8 @@ impl Transpiler {
 
         if let Some(where_clause) = &stmt.where_clause {
             sql.push_str(&format!(" WHERE {}", self.condition(where_clause, false)));
+        } else {
+            sql.push_str(" WHERE 1");
         }
 
         Ok(sql)
@@ -705,7 +707,7 @@ mod tests {
     #[test]
     fn test_delete_all() {
         let (sql, params) = transpile(Statement::Delete(DeleteStatement::new(TableRef::new("events"))));
-        assert_eq!(sql, "ALTER TABLE events DELETE");
+        assert_eq!(sql, "ALTER TABLE events DELETE WHERE 1");
         assert!(params.is_empty());
     }
 

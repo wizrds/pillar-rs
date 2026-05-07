@@ -1,9 +1,9 @@
+use std::collections::VecDeque;
 use arrow::buffer::Buffer;
 use arrow::ipc::reader::StreamDecoder;
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use futures::stream::{self, Stream, BoxStream, StreamExt};
-use futures::AsyncReadExt;
 
 use pillar_core::{
     ast::Statement,
@@ -16,8 +16,6 @@ use pillar_core::{
 
 use crate::dialect::ClickHouseDialect;
 
-
-const CHUNK_SIZE: usize = 65536;
 
 /// A [`pillar_core::database::Database`](pillar_core::database::Database) implementation backed by ClickHouse.
 pub struct ClickHouseDatabase {
@@ -66,37 +64,45 @@ impl ClickHouseDatabase {
     }
 
     fn decode_stream(cursor: clickhouse::query::BytesCursor) -> impl Stream<Item = Result<RecordBatch, Error>> {
-        stream::unfold((cursor, StreamDecoder::new(), false), |(mut cursor, mut decoder, done)| async move {
-            if done {
-                return None;
-            }
+        stream::unfold(
+            (cursor, StreamDecoder::new(), VecDeque::<RecordBatch>::new(), false),
+            |(mut cursor, mut decoder, mut pending, done)| async move {
+                if done {
+                    return None;
+                }
 
-            let mut chunk = vec![0u8; CHUNK_SIZE];
+                if let Some(batch) = pending.pop_front() {
+                    return Some((Ok(batch), (cursor, decoder, pending, false)));
+                }
 
-            loop {
-                match cursor.read(&mut chunk).await {
-                    Err(e) => return Some((Err(Error::connection(e.to_string())), (cursor, decoder, true))),
-                    Ok(0) => {
-                        if let Err(e) = decoder.finish() {
-                            return Some((Err(Error::unexpected(e.to_string())), (cursor, decoder, true)));
+                loop {
+                    match cursor.next().await {
+                        Err(e) => return Some((Err(Error::connection(e.to_string())), (cursor, decoder, pending, true))),
+                        Ok(None) => {
+                            return match decoder.finish() {
+                                Err(e) => Some((Err(Error::unexpected(e.to_string())), (cursor, decoder, pending, true))),
+                                Ok(()) => None,
+                            };
                         }
+                        Ok(Some(chunk)) => {
+                            let mut buf = Buffer::from(chunk.as_ref());
 
-                        return None;
-                    }
-                    Ok(n) => {
-                        let mut buf = Buffer::from(&chunk[..n]);
+                            while !buf.is_empty() {
+                                match decoder.decode(&mut buf) {
+                                    Err(e) => return Some((Err(Error::unexpected(e.to_string())), (cursor, decoder, pending, true))),
+                                    Ok(Some(batch)) => pending.push_back(batch),
+                                    Ok(None) => {}
+                                }
+                            }
 
-                        while !buf.is_empty() {
-                            match decoder.decode(&mut buf) {
-                                Err(e) => return Some((Err(Error::unexpected(e.to_string())), (cursor, decoder, true))),
-                                Ok(Some(batch)) => return Some((Ok(batch), (cursor, decoder, false))),
-                                Ok(None) => {}
+                            if let Some(batch) = pending.pop_front() {
+                                return Some((Ok(batch), (cursor, decoder, pending, false)));
                             }
                         }
                     }
                 }
-            }
-        })
+            },
+        )
     }
 }
 

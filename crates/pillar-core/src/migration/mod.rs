@@ -14,8 +14,8 @@ pub use traits::{
 use async_trait::async_trait;
 use crate::{
     ast::{
-        ColumnDefinition, ColumnType, CreateTableStatement, DeleteStatement, InsertStatement,
-        Projection, SelectStatement, Statement, TableRef,
+        ColumnDefinition, ColumnType, CreateTableStatement, InsertStatement,
+        OnConflict, OnConflictAction, Projection, SelectStatement, Statement, TableRef,
     },
     database::{AsDynDatabase, Database},
     errors::Error,
@@ -68,30 +68,26 @@ impl<M: Migrations> MigrationRunner<M> {
     }
 
     async fn set_revision_id(&self, database: &dyn Database, revision_id: &str) -> Result<(), Error> {
-        let result = database
-            .query(&Statement::TableExists("_migrations".to_owned()))
-            .await?;
-
-        let count = result.get_as::<u64>(0, 0)
-            .unwrap_or_else(|| result.get_as::<i64>(0, 0).unwrap_or(0) as u64);
-
-        if count == 0 {
-            database.execute(&Statement::CreateTable(
-                CreateTableStatement::new("_migrations")
-                    .columns(vec![ColumnDefinition::new("revision_id", ColumnType::String)]),
-            ))
-            .await?;
-        } else {
-            database.execute(&Statement::Delete(
-                DeleteStatement::new(TableRef::new("_migrations")),
-            ))
-            .await?;
-        }
+        database.execute(&Statement::CreateTable(
+            CreateTableStatement::new("_migrations")
+                .if_not_exists()
+                .columns(vec![
+                    ColumnDefinition::new("revision_id", ColumnType::String).primary_key(),
+                ]),
+        ))
+        .await?;
 
         database.execute(&Statement::Insert(
             InsertStatement::new(TableRef::new("_migrations"))
                 .columns(vec!["revision_id".into()])
-                .values(vec![vec![Value::String(revision_id.to_owned())]]),
+                .values(vec![vec![Value::String(revision_id.to_owned())]])
+                .on_conflict(OnConflict {
+                    target: vec!["revision_id".into()],
+                    action: OnConflictAction::DoUpdate {
+                        set: vec![("revision_id".into(), Value::String(revision_id.to_owned()))],
+                        where_clause: None,
+                    },
+                }),
         ))
         .await?;
 
