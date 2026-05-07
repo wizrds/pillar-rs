@@ -1,6 +1,6 @@
 use arrow::record_batch::RecordBatch;
 
-use crate::{column::ColumnDef, errors::Error};
+use crate::{column::ColumnDef, errors::Error, value::Value};
 
 
 /// Describes a table-backed data type that can be queried and mutated through pillar.
@@ -18,6 +18,9 @@ pub trait Model: Sized + Send + Sync {
 
     /// Serializes a slice of this model into a [`RecordBatch`].
     fn to_record_batch(rows: &[Self]) -> Result<RecordBatch, Error>;
+
+    /// Serializes this model instance into a row of [`Value`]s in column order.
+    fn to_row(&self) -> Vec<Value>;
 
     /// Returns the names of all columns marked as primary keys.
     fn primary_keys() -> Vec<&'static str> {

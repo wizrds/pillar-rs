@@ -1,25 +1,4 @@
 use futures::stream::{Stream, StreamExt};
-use arrow::{
-    array::{
-        Array,
-        BinaryArray, LargeBinaryArray,
-        BooleanArray,
-        Float32Array, Float64Array,
-        Int8Array, Int16Array, Int32Array, Int64Array,
-        StringArray, LargeStringArray,
-        UInt8Array, UInt16Array, UInt32Array, UInt64Array,
-    },
-    datatypes::DataType,
-    record_batch::RecordBatch,
-};
-#[cfg(feature = "chrono")]
-use arrow::array::{Date32Array, Time64NanosecondArray, TimestampNanosecondArray};
-#[cfg(feature = "chrono")]
-use arrow::datatypes::TimeUnit;
-#[cfg(feature = "chrono")]
-use chrono::TimeZone;
-#[cfg(feature = "uuid")]
-use arrow::array::FixedSizeBinaryArray;
 
 use crate::{
     errors::Error,
@@ -314,7 +293,7 @@ impl<M: Model> InsertEntity<M> {
                         .collect()
                 )
                 .values(
-                    Self::rows_from_batch(&M::to_record_batch(&models)?)?
+                    models.iter().map(|m| m.to_row()).collect()
                 ),
             _marker: std::marker::PhantomData,
         })
@@ -338,109 +317,6 @@ impl<M: Model> InsertEntity<M> {
                 .await?
                 .rows_affected
         )
-    }
-
-    fn rows_from_batch(batch: &RecordBatch) -> Result<Vec<Vec<Value>>, Error> {
-        (0..batch.num_rows())
-            .map(|row| {
-                batch
-                    .columns()
-                    .iter()
-                    .map(|col| Self::value_from_array(col.as_ref(), row))
-                    .collect()
-            })
-            .collect()
-    }
-
-    fn value_from_array(array: &dyn Array, row: usize) -> Result<Value, Error> {
-        if array.is_null(row) {
-            return Ok(Value::Null);
-        }
-
-        match array.data_type() {
-            DataType::Boolean => Ok(Value::Boolean(
-                array.as_any().downcast_ref::<BooleanArray>().unwrap().value(row)
-            )),
-            DataType::Int8 => Ok(Value::Int8(
-                array.as_any().downcast_ref::<Int8Array>().unwrap().value(row)
-            )),
-            DataType::Int16 => Ok(Value::Int16(
-                array.as_any().downcast_ref::<Int16Array>().unwrap().value(row)
-            )),
-            DataType::Int32 => Ok(Value::Int32(
-                array.as_any().downcast_ref::<Int32Array>().unwrap().value(row)
-            )),
-            DataType::Int64 => Ok(Value::Int64(
-                array.as_any().downcast_ref::<Int64Array>().unwrap().value(row)
-            )),
-            DataType::UInt8 => Ok(Value::UInt8(
-                array.as_any().downcast_ref::<UInt8Array>().unwrap().value(row)
-            )),
-            DataType::UInt16 => Ok(Value::UInt16(
-                array.as_any().downcast_ref::<UInt16Array>().unwrap().value(row)
-            )),
-            DataType::UInt32 => Ok(Value::UInt32(
-                array.as_any().downcast_ref::<UInt32Array>().unwrap().value(row)
-            )),
-            DataType::UInt64 => Ok(Value::UInt64(
-                array.as_any().downcast_ref::<UInt64Array>().unwrap().value(row)
-            )),
-            DataType::Float32 => Ok(Value::Float32(
-                array.as_any().downcast_ref::<Float32Array>().unwrap().value(row)
-            )),
-            DataType::Float64 => Ok(Value::Float64(
-                array.as_any().downcast_ref::<Float64Array>().unwrap().value(row)
-            )),
-            DataType::Utf8 => Ok(Value::String(
-                array.as_any().downcast_ref::<StringArray>().unwrap().value(row).to_owned()
-            )),
-            DataType::LargeUtf8 => Ok(Value::String(
-                array.as_any().downcast_ref::<LargeStringArray>().unwrap().value(row).to_owned()
-            )),
-            DataType::Binary => Ok(Value::Bytes(
-                array.as_any().downcast_ref::<BinaryArray>().unwrap().value(row).to_vec()
-            )),
-            DataType::LargeBinary => Ok(Value::Bytes(
-                array.as_any().downcast_ref::<LargeBinaryArray>().unwrap().value(row).to_vec()
-            )),
-            #[cfg(feature = "chrono")]
-            DataType::Date32 => {
-                let days = array.as_any().downcast_ref::<Date32Array>().unwrap().value(row);
-                chrono::NaiveDate::from_ymd_opt(1970, 1, 1)
-                    .unwrap()
-                    .checked_add_signed(chrono::Duration::days(days as i64))
-                    .ok_or_else(|| Error::serialization("date value out of range"))
-                    .map(Value::Date)
-            },
-            #[cfg(feature = "chrono")]
-            DataType::Time64(TimeUnit::Nanosecond) => {
-                let nanos = array.as_any().downcast_ref::<Time64NanosecondArray>().unwrap().value(row);
-                chrono::NaiveTime::from_num_seconds_from_midnight_opt(
-                    (nanos / 1_000_000_000) as u32,
-                    (nanos % 1_000_000_000) as u32,
-                )
-                .ok_or_else(|| Error::serialization("time value out of range"))
-                .map(Value::Time)
-            },
-            #[cfg(feature = "chrono")]
-            DataType::Timestamp(TimeUnit::Nanosecond, _) => {
-                let nanos = array.as_any().downcast_ref::<TimestampNanosecondArray>().unwrap().value(row);
-                chrono::Utc
-                    .timestamp_opt(nanos / 1_000_000_000, (nanos % 1_000_000_000) as u32)
-                    .single()
-                    .ok_or_else(|| Error::serialization("datetime value out of range"))
-                    .map(Value::DateTime)
-            },
-            #[cfg(feature = "uuid")]
-            DataType::FixedSizeBinary(16) => {
-                uuid::Uuid::from_slice(
-                    array.as_any().downcast_ref::<FixedSizeBinaryArray>().unwrap().value(row)
-                )
-                .map(Value::Uuid)
-                .map_err(|e| Error::serialization(e.to_string()))
-            },
-            other => Err(Error::serialization(format!("unsupported Arrow data type: {other:?}"))),
-        }
     }
 }
 

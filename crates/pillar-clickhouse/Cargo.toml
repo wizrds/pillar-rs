@@ -22,8 +22,9 @@ futures = { workspace = true }
 clickhouse = { version = "0.15", features = ["futures03"] }
 
 chrono = { workspace = true, optional = true }
+uuid = { workspace = true, optional = true }
 
 [features]
 default = []
 chrono = ["pillar-core/chrono", "dep:chrono"]
-uuid = ["pillar-core/uuid"]
+uuid = ["pillar-core/uuid", "dep:uuid"]

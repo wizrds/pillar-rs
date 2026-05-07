@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use arrow::{
     array::{
         Array,
@@ -7,7 +8,7 @@ use arrow::{
         LargeStringArray, StringArray,
         UInt8Array, UInt16Array, UInt32Array, UInt64Array,
     },
-    datatypes::SchemaRef,
+    datatypes::{Schema, SchemaRef},
     record_batch::RecordBatch,
 };
 
@@ -27,6 +28,12 @@ pub struct QueryResult {
 }
 
 impl QueryResult {
+    pub fn empty() -> Self {
+        Self {
+            batch: RecordBatch::new_empty(Arc::new(Schema::empty())),
+        }
+    }
+
     /// Returns the number of rows in the result.
     pub fn num_rows(&self) -> usize {
         self.batch.num_rows()

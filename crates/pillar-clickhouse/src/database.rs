@@ -15,17 +15,23 @@ use pillar_core::{
 };
 
 use crate::dialect::ClickHouseDialect;
+use crate::normalize::BatchNormalizer;
 
 
 /// A [`pillar_core::database::Database`](pillar_core::database::Database) implementation backed by ClickHouse.
 pub struct ClickHouseDatabase {
     client: clickhouse::Client,
     dialect: ClickHouseDialect,
+    normalizer: BatchNormalizer,
 }
 
 impl ClickHouseDatabase {
     pub fn new(client: clickhouse::Client) -> Self {
-        Self { client, dialect: ClickHouseDialect }
+        Self {
+            client,
+            dialect: ClickHouseDialect,
+            normalizer: BatchNormalizer::new(),
+        }
     }
 
     pub fn builder(url: impl Into<String>) -> ClickHouseDatabaseBuilder {
@@ -131,13 +137,14 @@ impl Database for ClickHouseDatabase {
             .map_err(|e| Error::connection(e.to_string()))?;
 
         let batches = Self::decode_stream(cursor)
+            .map(|r| r.and_then(|b| self.normalizer.normalize(b)))
             .collect::<Vec<_>>()
             .await
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?;
 
         match batches.len() {
-            0 => Err(Error::unexpected("query returned no record batches")),
+            0 => Ok(QueryResult::empty()),
             1 => Ok(QueryResult::from(batches.into_iter().next().unwrap())),
             _ => arrow::compute::concat_batches(&batches[0].schema(), &batches)
                 .map(QueryResult::from)
@@ -157,7 +164,7 @@ impl Database for ClickHouseDatabase {
                     .fetch_bytes("ArrowStream")
                     .map_err(|e| Error::connection(e.to_string()))?,
             )
-            .map(|r| r.map(QueryResult::from)),
+            .map(|r| r.and_then(|b| self.normalizer.normalize(b)).map(QueryResult::from)),
         ))
     }
 }
@@ -168,6 +175,7 @@ pub struct ClickHouseDatabaseBuilder {
     database: Option<String>,
     username: Option<String>,
     password: Option<String>,
+    settings: Vec<(String, String)>,
 }
 
 impl ClickHouseDatabaseBuilder {
@@ -178,6 +186,7 @@ impl ClickHouseDatabaseBuilder {
             database: None,
             username: None,
             password: None,
+            settings: Vec::new(),
         }
     }
 
@@ -199,6 +208,12 @@ impl ClickHouseDatabaseBuilder {
         self
     }
 
+    /// Adds a ClickHouse session setting applied to every query on this client.
+    pub fn setting(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+        self.settings.push((name.into(), value.into()));
+        self
+    }
+
     /// Builds the [`ClickHouseDatabase`](crate::database::ClickHouseDatabase).
     pub fn build(self) -> ClickHouseDatabase {
         let mut client = clickhouse::Client::default()
@@ -214,6 +229,10 @@ impl ClickHouseDatabaseBuilder {
 
         if let Some(password) = self.password {
             client = client.with_password(password);
+        }
+
+        for (name, value) in self.settings {
+            client = client.with_setting(name, value);
         }
 
         ClickHouseDatabase::new(client)

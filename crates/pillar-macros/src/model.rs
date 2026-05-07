@@ -43,6 +43,11 @@ fn model_struct(table_name: &str, fields: &[FieldAttrs]) -> syn::Result<TokenStr
 
     let columns_body = columns_body(fields)?;
 
+    let row_fields = fields.iter().filter(|f| !f.skip).map(|f| {
+        let ident = f.ident.as_ref().unwrap();
+        quote! { ::pillar::value::Value::from(self.#ident.clone()) }
+    });
+
     Ok(quote! {
         #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
         pub struct Model {
@@ -56,6 +61,10 @@ fn model_struct(table_name: &str, fields: &[FieldAttrs]) -> syn::Result<TokenStr
 
             fn columns() -> &'static [::pillar::column::ColumnDef] {
                 #columns_body
+            }
+
+            fn to_row(&self) -> ::std::vec::Vec<::pillar::value::Value> {
+                vec![#(#row_fields),*]
             }
 
             fn from_record_batch(
