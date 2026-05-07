@@ -694,7 +694,7 @@ mod tests {
     }
 
     fn col(name: &str, data_type: ColumnType) -> ColumnDefinition {
-        ColumnDefinition { name: name.into(), data_type, nullable: false, primary_key: false, default: None }
+        ColumnDefinition::new(name, data_type)
     }
 
     #[test]

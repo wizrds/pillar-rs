@@ -87,6 +87,7 @@ pub struct ColumnDefinition {
     pub data_type: ColumnType,
     pub nullable: bool,
     pub primary_key: bool,
+    pub unique: bool,
     pub default: Option<Value>,
 }
 
@@ -98,6 +99,7 @@ impl ColumnDefinition {
             data_type,
             nullable: false,
             primary_key: false,
+            unique: false,
             default: None,
         }
     }
@@ -111,6 +113,12 @@ impl ColumnDefinition {
     /// Marks the column as a primary key.
     pub fn primary_key(mut self) -> Self {
         self.primary_key = true;
+        self
+    }
+
+    /// Marks the column as unique.
+    pub fn unique(mut self) -> Self {
+        self.unique = true;
         self
     }
 

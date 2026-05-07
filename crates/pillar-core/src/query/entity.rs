@@ -24,6 +24,8 @@ use arrow::array::FixedSizeBinaryArray;
 use crate::{
     errors::Error,
     ast::{
+        ColumnDefinition,
+        CreateTableStatement,
         DeleteStatement,
         InsertStatement,
         Join,
@@ -611,3 +613,24 @@ pub trait EntityOps: Model + Sized {
 }
 
 impl<M: Model> EntityOps for M {}
+
+/// A [`Model`](crate::model::Model) that can produce the DDL statement needed to create its backing table.
+pub trait TableSchema: Model {
+    /// Returns a [`Statement`](crate::ast::Statement) that creates the backing table for this model.
+    fn create_statement() -> Statement {
+        Statement::CreateTable(
+            CreateTableStatement::new(Self::table_name())
+                .if_not_exists()
+                .columns(
+                    Self::columns()
+                        .iter()
+                        .map(ColumnDefinition::from)
+                        .collect(),
+                ),
+        )
+    }
+}
+
+impl<M: Model> TableSchema for M {}
+
+

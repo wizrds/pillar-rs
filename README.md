@@ -21,7 +21,7 @@ Available features:
 
 ### Defining a model
 
-Place your `#[derive(Model)]` struct inside a module. The macro generates a `Model` struct and a `Column` struct with typed accessors, all in the same module scope, which are then used to perform queries and operations on the database.
+Place your `#[derive(Model)]` struct inside a module. The macro generates a `Model` struct and a `Column` struct with typed accessors in the same module scope.
 
 ```rust
 pub mod events {
@@ -39,11 +39,71 @@ pub mod events {
 }
 ```
 
-The `#[pillar(table = "...")]` attribute sets the table name. If omitted it defaults to the snake_case of the struct name. Fields can be annotated with:
-- `#[pillar(primary_key)]` marks the field as a primary key
-- `#[pillar(unique)]` marks the field as unique
-- `#[pillar(column = "custom_name")]` overrides the column name
-- `#[pillar(skip)]` excludes the field from the schema
+#### Model struct attributes
+
+| Attribute | Type | Description |
+|---|---|---|
+| `table` | `String` | Table name. Defaults to the snake_case struct name. |
+| `engine` | `String` | Storage engine (e.g. `"MergeTree"`). Passed through to the backend; ignored by backends that do not use it. |
+| `partition_by` | `String` | Partition key expression (e.g. `"toYYYYMM(occurred_at)"`). |
+| `ttl` | sub-attrs | TTL rule for automatic row expiry. See below. |
+| `options` | key-value map | Catch-all for any backend-specific option not covered by a named field. |
+
+#### Model field attributes
+
+| Attribute | Type | Description |
+|---|---|---|
+| `primary_key` | flag | Marks the field as a primary key. |
+| `unique` | flag | Marks the field as unique. |
+| `column` | `String` | Overrides the column name. |
+| `column_type` | `String` | Overrides the inferred column type with a raw backend type string. |
+| `order_by` | flag | Includes this field in the ORDER BY key of the generated `create_statement`. |
+| `skip` | flag | Excludes the field from the schema entirely. |
+
+#### TTL
+
+TTL is expressed as a strongly typed sub-attribute on the struct:
+
+```rust
+#[derive(Model)]
+#[pillar(
+    table = "events",
+    engine = "MergeTree",
+    partition_by = "toYYYYMM(occurred_at)",
+    ttl(column = "occurred_at", interval = 90, unit = "day")
+)]
+pub struct Event {
+    #[pillar(order_by)]
+    pub id: uuid::Uuid,
+    pub name: String,
+    pub severity: i32,
+    #[pillar(order_by)]
+    pub occurred_at: chrono::DateTime<chrono::Utc>,
+}
+```
+
+Valid `unit` values: `"second"`, `"minute"`, `"hour"`, `"day"`, `"week"`, `"month"`, `"year"` (singular or plural).
+
+#### Schema provisioning
+
+When DDL attributes (`engine`, `partition_by`, `ttl`, `order_by`, or `options`) are present, the macro generates an impl of `TableSchema` for the model, which provides `create_statement()`. Without DDL attributes a blanket impl produces a plain `CREATE TABLE` from the column definitions.
+
+```rust
+database.execute(&events::Model::create_statement()).await?;
+```
+
+#### Backend-specific options
+
+Use `options` as a catch-all for any backend-specific key-value pair not covered by a named attribute:
+
+```rust
+#[pillar(
+    table = "events",
+    engine = "MergeTree",
+    options(index_granularity = "8192")
+)]
+pub struct Event { /* ... */ }
+```
 
 ### Connecting to a database
 
@@ -53,7 +113,7 @@ The `#[pillar(table = "...")]` attribute sets the table name. If omitted it defa
 use pillar::duckdb::DuckDbDatabase;
 
 let database = DuckDbDatabase::in_memory().await?;
-// or: DuckDbDatabase::open("path/to/file.database").await?
+// or: DuckDbDatabase::open("path/to/file.db").await?
 ```
 
 **ClickHouse:**
@@ -66,40 +126,6 @@ let database = ClickHouseDatabase::builder()
     .database("my_db")
     .build()
     .await?;
-```
-
-### Schema management
-
-Use the AST types directly to create tables:
-
-```rust
-use pillar::prelude::*;
-
-database
-    .execute(
-        &Statement::CreateTable(
-            CreateTableStatement::new("events")
-                .if_not_exists()
-                .columns(vec![
-                    ColumnDefinition::new("id", ColumnType::Uuid).primary_key(),
-                    ColumnDefinition::new("name", ColumnType::String),
-                    ColumnDefinition::new("severity", ColumnType::Int32),
-                    ColumnDefinition::new("occurred_at", ColumnType::DateTime),
-                ]),
-        )
-    )
-    .await?;
-```
-
-TTL is a first-class citizen and is emitted natively on ClickHouse and silently ignored on DuckDB:
-
-```rust
-CreateTableStatement::new("events")
-    .columns(vec![/* ... */])
-    .ttl(TtlClause::delete(
-        "occurred_at",
-        Interval::new(90, IntervalUnit::Day),
-    ));
 ```
 
 ### Migrations
@@ -117,12 +143,16 @@ impl Migration for CreateEventsTable {
     fn previous_id(&self) -> Option<&'static str> { None }
 
     async fn up(&self, op: &MigrateOp<'_>) -> Result<(), Error> {
-        op
-            .create_table(
-                CreateTableStatement::new("events")
-                    .columns(vec![/* ... */]),
-            )
-            .await?;
+        op.create_table(
+            CreateTableStatement::new("events")
+                .columns(vec![
+                    ColumnDefinition::new("id", ColumnType::Uuid).primary_key(),
+                    ColumnDefinition::new("name", ColumnType::String),
+                    ColumnDefinition::new("severity", ColumnType::Int32),
+                    ColumnDefinition::new("occurred_at", ColumnType::DateTime),
+                ]),
+        )
+        .await?;
 
         Ok(())
     }
@@ -145,12 +175,26 @@ database.upgrade::<MyMigrations>().await?;
 database.downgrade_to::<MyMigrations>("001_create_events").await?;
 ```
 
+Alternatively, models with DDL attributes can produce their own `create_statement()` via `TableSchema`, which can be used directly inside a migration:
+
+```rust
+async fn up(&self, op: &MigrateOp<'_>) -> Result<(), Error> {
+    op.execute(&events::Model::create_statement()).await?;
+
+    Ok(())
+}
+```
+
 ### Inserting
 
 ```rust
 events::Model::insert_batch(vec![
-    events::Model { id: Uuid::new_v4(), name: "login".into(), severity: 1, occurred_at: Utc::now() },
-    events::Model { id: Uuid::new_v4(), name: "failed_login".into(), severity: 3, occurred_at: Utc::now() },
+    events::Model {
+        id: Uuid::new_v4(),
+        name: "login".into(),
+        severity: 1,
+        occurred_at: Utc::now(),
+    },
 ])
 .expect("failed to build insert")
 .execute(&database)
@@ -161,11 +205,9 @@ events::Model::insert_batch(vec![
 
 ```rust
 // All rows
-let all = events::Model::find()
-    .all(&database)
-    .await?;
+let all = events::Model::find().all(&database).await?;
 
-// With a typed filter
+// Filtered and ordered
 let high = events::Model::find()
     .filter_expr(events::Column::severity().gte(3i32))
     .order_by_desc("severity")
@@ -180,9 +222,7 @@ let one = events::Model::find()
     .await?;
 
 // Streaming large result sets
-let mut stream = events::Model::find()
-    .stream(&database)
-    .await?;
+let mut stream = events::Model::find().stream(&database).await?;
 
 while let Some(rows) = stream.try_next().await? {
     // rows is Vec<events::Model>
@@ -202,21 +242,23 @@ events::Model::update()
 ### Deleting
 
 ```rust
-// Delete with a filter
+// Filtered delete
 events::Model::delete()
     .filter_expr(events::Column::severity().lt(3i32))
     .execute(&database)
     .await?;
 
 // Delete all rows
-events::Model::delete_all()
-    .execute(&database)
-    .await?;
+events::Model::delete_all().execute(&database).await?;
 ```
 
 ### Materialized views
 
-Define a materialized view the same way as a model using `#[derive(MaterializedView)]`. The `from` and `filter` attributes bake a base query into the view definition.
+Define a materialized view with `#[derive(MaterializedView)]`. The macro generates a `View` struct and a `Column` struct, parallel to how `Model` works.
+
+#### Simple pass-through view
+
+Use `from` and `filter` to bake a query into the view definition:
 
 ```rust
 pub mod high_severity_events {
@@ -233,54 +275,128 @@ pub mod high_severity_events {
 }
 ```
 
-Instead of using the `from` and `filter` attributes, you can also define the query manually by implementing `ViewQuery` for the view struct:
+#### Aggregate rollup view
+
+Mark aggregate fields with `#[pillar(aggregate = "...")]`. Non-aggregate fields are automatically used as GROUP BY keys. Use `source` to specify the source column when it differs from the destination field name.
 
 ```rust
-use pillar::prelude::*;
+pub mod events_by_minute {
+    use pillar::prelude::*;
 
-impl ViewQuery for high_severity_events::View {
-    fn query() -> SelectStatement {
-        SelectStatement::new(TableRef::new("events"))
-            .projections(vec![
-                Projection::Column("id".into()),
-                Projection::Column("name".into()),
-                Projection::Column("severity".into()),
-                Projection::Column("occurred_at".into()),
-            ])
-            .where_clause(ConditionExpression::gte("severity", 3i32))
+    #[derive(MaterializedView)]
+    #[pillar(
+        view = "events_by_minute_mv",
+        from = "events",
+        to = "events_by_minute",
+        engine = "SummingMergeTree",
+        partition_by = "toYYYYMM(event_time)"
+    )]
+    pub struct EventByMinute {
+        #[pillar(order_by)]
+        pub event_time: chrono::DateTime<chrono::Utc>,
+        #[pillar(order_by)]
+        pub host: String,
+        #[pillar(aggregate = "count")]
+        pub event_count: u64,
+        #[pillar(aggregate = "sum", source = "duration_ms")]
+        pub duration_ms_sum: u64,
+        #[pillar(aggregate = "sum", source = "bytes")]
+        pub bytes_sum: u64,
     }
 }
 ```
 
-Create the view in the database:
+Valid `aggregate` values: `"count"`, `"sum"`, `"avg"`, `"min"`, `"max"`.
+
+#### View struct attributes
+
+| Attribute | Type | Description |
+|---|---|---|
+| `view` | `String` | View name. Defaults to the snake_case struct name. |
+| `from` | `String` | Source table for the auto-generated `ViewQuery` impl. |
+| `filter` | `String` | Optional WHERE filter on the generated query. |
+| `to` | `String` | Routes MV output to this table (ClickHouse `TO table`). Ignored by DuckDB. |
+| `engine` | `String` | Storage engine for the MV (e.g. `"SummingMergeTree"`). |
+| `partition_by` | `String` | Partition key expression for the MV. |
+| `options` | key-value map | Catch-all for backend-specific options. |
+
+#### View field attributes
+
+| Attribute | Type | Description |
+|---|---|---|
+| `column` | `String` | Overrides the column name. |
+| `column_type` | `String` | Overrides the inferred column type with a raw backend type string. |
+| `order_by` | flag | Includes this field in the ORDER BY key of the generated `create_statement`. |
+| `aggregate` | `String` | Aggregate function for this field (`"count"`, `"sum"`, `"avg"`, `"min"`, `"max"`). |
+| `source` | `String` | Source column name for the aggregate. Defaults to the field name. |
+| `skip` | flag | Excludes the field from the schema. |
+
+#### Schema provisioning
+
+`ViewSchema::create_statement()` is available on all views. The blanket impl emits a plain `CREATE MATERIALIZED VIEW`. When `to`, `engine`, `partition_by`, or `options` are set, the macro generates an explicit override that includes those backend-specific details.
 
 ```rust
-database
-    .execute(&high_severity_events::View::create_statement())
-    .await?;
+database.execute(&events_by_minute::View::create_statement()).await?;
 ```
 
-Query it with additional callsite filters:
+#### Manual ViewQuery
+
+When the macro's `from`/`filter`/`aggregate` attributes are not expressive enough, implement `ViewQuery` manually:
+
+```rust
+impl ViewQuery for events_by_minute::View {
+    fn query() -> SelectStatement {
+        SelectStatement::new(TableRef::new("events"))
+            .projections(vec![
+                Projection::Column("event_time".into()),
+                Projection::Column("host".into()),
+                Projection::Aggregate(AggregateFunction::Count(CountArg::All)),
+                Projection::Aggregate(AggregateFunction::Sum("duration_ms".into())),
+                Projection::Aggregate(AggregateFunction::Sum("bytes".into())),
+            ])
+            .group_by(vec!["event_time".into(), "host".into()])
+    }
+}
+```
+
+### Querying views
+
+Views use the same query API as models:
 
 ```rust
 let results = high_severity_events::View::find()
-    .filter_expr(high_severity_events::Column::name().eq("brute_force_attempt"))
-    .order_by_desc("severity")
+    .filter_expr(high_severity_events::Column::severity().gte(4i32))
+    .order_by_desc("occurred_at")
+    .limit(100)
     .all(&database)
     .await?;
 ```
 
 ### Typed column accessors
 
-`Column` provides a typed accessor for every field. Each accessor returns a `TypedColumn<T>` which carries the column name and exposes comparison methods that return a `ConditionExpression`:
+Every `Model` and `MaterializedView` gets a `Column` struct with a typed accessor per field:
 
 ```rust
 events::Column::severity().eq(3i32)
 events::Column::severity().gte(3i32)
-events::Column::severity().lt(5i32)
+events::Column::severity().between(1i32, 5i32)
 events::Column::name().like("%login%")
 events::Column::id().is_null()
+events::Column::occurred_at().lt(cutoff)
 ```
+
+Each accessor returns a `TypedColumn<T>`, which exposes: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in_list`, `is_not_in`, `is_null`, `is_not_null`, `between`, `not_between`, `like`, `not_like`.
+
+### Custom column types
+
+Use `column_type` to pass a raw type string through to the backend for types not in the `ColumnType` enum:
+
+```rust
+#[pillar(column_type = "AggregateFunction(sum, UInt64)")]
+pub bytes_sum: u64,
+```
+
+On backends that do not understand the type, it is emitted verbatim.
 
 ## License
 

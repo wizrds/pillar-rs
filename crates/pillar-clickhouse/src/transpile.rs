@@ -13,13 +13,13 @@ use pillar_core::{
 };
 
 
-pub(crate) struct Transpiler {
+pub struct Transpiler {
     params: Vec<Value>,
     count: usize,
 }
 
 impl Transpiler {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self { params: Vec::new(), count: 0 }
     }
 
@@ -559,11 +559,11 @@ mod tests {
     }
 
     fn col(name: &str, data_type: ColumnType) -> ColumnDefinition {
-        ColumnDefinition { name: name.into(), data_type, nullable: false, primary_key: false, default: None }
+        ColumnDefinition::new(name, data_type)
     }
 
     fn col_nullable(name: &str, data_type: ColumnType) -> ColumnDefinition {
-        ColumnDefinition { name: name.into(), data_type, nullable: true, primary_key: false, default: None }
+        ColumnDefinition::new(name, data_type).nullable()
     }
 
     #[test]

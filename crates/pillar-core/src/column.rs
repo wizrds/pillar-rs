@@ -1,7 +1,7 @@
 use crate::{
     value::Value,
     condition::ConditionExpression,
-    ast::schema::ColumnType
+    ast::schema::{ColumnDefinition, ColumnType},
 };
 
 
@@ -13,6 +13,20 @@ pub struct ColumnDef {
     pub nullable: bool,
     pub primary_key: bool,
     pub unique: bool,
+    pub default: Option<Value>,
+}
+
+impl From<&ColumnDef> for ColumnDefinition {
+    fn from(col: &ColumnDef) -> Self {
+        Self {
+            name: col.name.to_string(),
+            data_type: col.column_type.clone(),
+            nullable: col.nullable,
+            primary_key: col.primary_key,
+            unique: col.unique,
+            default: col.default.clone(),
+        }
+    }
 }
 
 /// Converts a value into a column name string for use in a query.

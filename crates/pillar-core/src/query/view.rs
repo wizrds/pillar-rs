@@ -132,8 +132,10 @@ pub trait ViewOps: MaterializedView + Sized {
     }
 }
 
-/// Provides a `create_statement` entry point for any type implementing [`ViewQuery`](crate::view::ViewQuery).
-pub trait DefinedView: ViewQuery + Sized {
+impl<V: MaterializedView> ViewOps for V {}
+
+/// A [`MaterializedView`](crate::view::MaterializedView) that can produce the DDL statement needed to create itself.
+pub trait ViewSchema: ViewQuery + Sized {
     /// Returns a [`Statement`](crate::ast::Statement) that creates this materialized view.
     fn create_statement() -> Statement {
         Statement::CreateMaterializedView(
@@ -142,6 +144,4 @@ pub trait DefinedView: ViewQuery + Sized {
     }
 }
 
-impl<V: ViewQuery> DefinedView for V {}
-
-impl<V: MaterializedView> ViewOps for V {}
+impl<V: ViewQuery> ViewSchema for V {}
