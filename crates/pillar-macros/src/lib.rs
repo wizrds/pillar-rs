@@ -2,7 +2,6 @@
 extern crate self as pillar_macros;
 
 mod attr;
-mod codegen;
 mod column;
 mod condition;
 mod model;

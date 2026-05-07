@@ -5,7 +5,6 @@ use darling::{ast, util, FromDeriveInput, FromField};
 #[darling(attributes(pillar), supports(struct_named))]
 pub struct ModelAttrs {
     pub ident: syn::Ident,
-    pub generics: syn::Generics,
     pub data: ast::Data<util::Ignored, FieldAttrs>,
     pub table: Option<String>,
 }
@@ -14,7 +13,6 @@ pub struct ModelAttrs {
 #[darling(attributes(pillar), supports(struct_named))]
 pub struct ViewAttrs {
     pub ident: syn::Ident,
-    pub generics: syn::Generics,
     pub data: ast::Data<util::Ignored, FieldAttrs>,
     pub view: Option<String>,
     pub from: Option<String>,

@@ -1,6 +1,76 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
+use crate::attr::FieldAttrs;
+
+
+pub fn columns_body(fields: &[FieldAttrs]) -> syn::Result<TokenStream> {
+    let defs = fields
+        .iter()
+        .filter(|f| !f.skip)
+        .map(column_def)
+        .collect::<syn::Result<Vec<_>>>()?;
+
+    let count = defs.len();
+
+    Ok(quote! {
+        static COLUMNS: [::pillar::column::ColumnDef; #count] = [#(#defs),*];
+        &COLUMNS
+    })
+}
+
+pub fn column_struct(fields: &[FieldAttrs]) -> syn::Result<TokenStream> {
+    let fns = fields
+        .iter()
+        .filter(|f| !f.skip)
+        .map(typed_column_fn)
+        .collect::<syn::Result<Vec<_>>>()?;
+
+    Ok(quote! {
+        pub struct Column;
+
+        impl Column {
+            #(#fns)*
+        }
+    })
+}
+
+fn column_def(field: &FieldAttrs) -> syn::Result<TokenStream> {
+    let name = field.column.as_deref()
+        .map(str::to_owned)
+        .unwrap_or_else(|| field.ident.as_ref().unwrap().to_string());
+
+    let info = column_info(&field.ty)?;
+    let column_type = info.column_type;
+    let nullable = info.nullable;
+    let primary_key = field.primary_key;
+    let unique = field.unique;
+
+    Ok(quote! {
+        ::pillar::column::ColumnDef {
+            name: #name,
+            column_type: #column_type,
+            nullable: #nullable,
+            primary_key: #primary_key,
+            unique: #unique,
+        }
+    })
+}
+
+fn typed_column_fn(field: &FieldAttrs) -> syn::Result<TokenStream> {
+    let ident = field.ident.as_ref().unwrap();
+    let col_name = field.column.as_deref()
+        .map(str::to_owned)
+        .unwrap_or_else(|| ident.to_string());
+
+    let rust_ty = unwrap_option(&field.ty).unwrap_or(&field.ty);
+
+    Ok(quote! {
+        pub fn #ident() -> ::pillar::column::TypedColumn<#rust_ty> {
+            ::pillar::column::TypedColumn::new(#col_name)
+        }
+    })
+}
 
 pub struct ColumnInfo {
     pub column_type: TokenStream,
