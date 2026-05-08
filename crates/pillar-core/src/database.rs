@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 
@@ -25,6 +26,25 @@ pub trait Database: Send + Sync {
     async fn query_stream(&self, statement: &Statement) -> Result<BoxStream<'_, Result<QueryResult, Error>>, Error>;
 }
 
+#[async_trait]
+impl<D: Database> Database for Arc<D> {
+    fn dialect(&self) -> &dyn Dialect {
+        (**self).dialect()
+    }
+
+    async fn execute(&self, statement: &Statement) -> Result<ExecutionResult, Error> {
+        (**self).execute(statement).await
+    }
+
+    async fn query(&self, statement: &Statement) -> Result<QueryResult, Error> {
+        (**self).query(statement).await
+    }
+
+    async fn query_stream(&self, statement: &Statement) -> Result<BoxStream<'_, Result<QueryResult, Error>>, Error> {
+        (**self).query_stream(statement).await
+    }
+}
+
 /// Converts a concrete database type into a `&dyn` [`Database`](crate::database::Database) reference.
 pub trait AsDynDatabase {
     fn as_dyn(&self) -> &dyn Database;
@@ -35,3 +55,4 @@ impl<D: Database> AsDynDatabase for D {
         self
     }
 }
+
