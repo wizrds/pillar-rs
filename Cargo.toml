@@ -1,7 +1,7 @@
 [workspace.package]
 version = "0.1.1"
 edition = "2024"
-description = "A thin ORM for columnar databases in Rust."
+description = "A thin abstraction for columnar databases in Rust."
 repository = "https://github.com/wizrds/pillar-rs"
 license = "ISC"
 readme = "README.md"
