@@ -42,7 +42,7 @@ body = """
 footer = """"""
 trim = true
 postprocessors = [
-    { pattern = '\$REPO', replace = "https://github.com/wizrds/doclayer-rs" },
+    { pattern = '\$REPO', replace = "https://github.com/wizrds/pillar-rs" },
 ]
 
 [git]

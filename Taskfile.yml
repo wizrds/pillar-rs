@@ -9,8 +9,3 @@ includes:
     taskfile: .taskfile/rust.yml
   utils:
     taskfile: .taskfile/utils.yml
-
-tasks:
-  run:test:
-    cmds:
-      - cargo run --manifest-path crates/pillar-test/Cargo.toml

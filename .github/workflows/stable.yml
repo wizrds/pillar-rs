@@ -9,7 +9,7 @@ jobs:
     if: |
       !contains(github.event.head_commit.message, '[skip-ci]') &&
       !startsWith(github.event.head_commit.message, 'chore(release):') &&
-      github.repository == 'wizrds/doclayer-rs'
+      github.repository == 'wizrds/pillar-rs'
     name: Bump version
     runs-on: ubuntu-latest
     permissions:
