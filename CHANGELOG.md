@@ -1,6 +1,12 @@
 # Changelog
 
 ---
+## [0.1.1](https://github.com/wizrds/pillar-rs/-/compare/0.1.0...0.1.1) - 2026-05-08
+
+### Bug Fixes
+
+- Ensure arc wrapped databases fulfill database trait - ([101f957](https://github.com/wizrds/pillar-rs/-/commit/101f9576d961e6cb6e3b35c8070c47bcb4682de1)) - Timothy Pogue
+---
 ## [0.1.0] - 2026-05-08
 
 ### Bug Fixes
