@@ -1,6 +1,16 @@
 # Changelog
 
 ---
+## [0.1.2](https://github.com/wizrds/pillar-rs/-/compare/0.1.1...0.1.2) - 2026-05-08
+
+### Bug Fixes
+
+- Ensure variants of smart pointers covered in trait - ([2feb7af](https://github.com/wizrds/pillar-rs/-/commit/2feb7af473e2ea693b9b05c2967e936e269eab23)) - Timothy Pogue
+
+### Miscellaneous
+
+- Update description - ([d53bd37](https://github.com/wizrds/pillar-rs/-/commit/d53bd3748815dbb32950af60402c519b7632c268)) - Timothy Pogue
+---
 ## [0.1.1](https://github.com/wizrds/pillar-rs/-/compare/0.1.0...0.1.1) - 2026-05-08
 
 ### Bug Fixes
