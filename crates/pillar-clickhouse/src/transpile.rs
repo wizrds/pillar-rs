@@ -1,12 +1,13 @@
 use pillar_core::{
     ast::{
-        AggregateFunction, AlterTableStatement, BinaryOperator, ColumnDefinition, CountArg,
-        CreateMaterializedViewStatement, CreateTableStatement, CreateViewStatement,
-        DeleteStatement, DropTableStatement, DropViewStatement, Expression, InsertStatement,
-        IntervalUnit, JoinType, NullsOrder, OrderDirection, Projection, SelectStatement,
-        Statement, UpdateStatement, AggregateFn, ColumnType
+        AggregateFunction, AlterTableStatement, BinaryOperator, ColumnDefinition, ColumnType,
+        CompoundSelect, CountArg, Cte, CreateMaterializedViewStatement, CreateTableStatement,
+        CreateViewStatement, DeleteStatement, DropTableStatement, DropViewStatement, Expression,
+        FrameBound, FrameUnit, FromSource, InsertBody, InsertStatement, IntervalUnit, JoinType,
+        NullsOrder, OrderDirection, Projection, SelectStatement, SetOperator, Statement,
+        UpdateStatement, AggregateFn, WindowFunc, WindowFunction, WindowSpec,
     },
-    condition::ConditionExpression,
+    condition::{ComparisonOp, ConditionExpression},
     dialect::PreparedStatement,
     errors::Error,
     value::{ToSql, Value},
@@ -40,19 +41,60 @@ impl Transpiler {
         "?".to_string()
     }
 
+    fn from_source(&mut self, src: &FromSource, inline: bool) -> Result<String, Error> {
+        match src {
+            FromSource::Table(t) => Ok(match &t.alias {
+                Some(alias) => format!("{} AS {}", t.name, alias),
+                None => t.name.clone(),
+            }),
+            FromSource::Subquery { query, alias } => {
+                let inner = self.select(query, inline)?;
+                Ok(format!("({inner}) AS {alias}"))
+            }
+        }
+    }
+
+    fn cte_clause(&mut self, ctes: &[Cte], inline: bool) -> Result<String, Error> {
+        if ctes.is_empty() {
+            return Ok(String::new());
+        }
+
+        let has_recursive = ctes.iter().any(|c| c.recursive);
+        let prefix = if has_recursive { "WITH RECURSIVE " } else { "WITH " };
+
+        let rendered = ctes
+            .iter()
+            .map(|cte| {
+                let cols = if cte.columns.is_empty() {
+                    String::new()
+                } else {
+                    format!(
+                        " ({})",
+                        cte.columns.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", "),
+                    )
+                };
+                let query = self.select(&cte.query, inline)?;
+                Ok(format!("{}{cols} AS ({query})", cte.name))
+            })
+            .collect::<Result<Vec<_>, Error>>()?;
+
+        Ok(format!("{prefix}{} ", rendered.join(", ")))
+    }
+
     fn select(&mut self, stmt: &SelectStatement, inline: bool) -> Result<String, Error> {
+        let with = self.cte_clause(&stmt.with, inline)?;
+        let from = self.from_source(&stmt.from, inline)?;
+
         let mut sql = format!(
-            "{} {} FROM {}",
+            "{}{} {} FROM {}",
+            with,
             if stmt.distinct { "SELECT DISTINCT" } else { "SELECT" },
             stmt.projections
                 .iter()
                 .map(|p| self.projection(p, inline))
                 .collect::<Vec<_>>()
                 .join(", "),
-            match &stmt.from.alias {
-                Some(alias) => format!("{} AS {}", stmt.from.name, alias),
-                None => stmt.from.name.clone(),
-            },
+            from,
         );
 
         for join in &stmt.joins {
@@ -78,7 +120,10 @@ impl Transpiler {
         }
 
         if !stmt.group_by.is_empty() {
-            sql.push_str(&format!(" GROUP BY {}", stmt.group_by.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", ")));
+            sql.push_str(&format!(
+                " GROUP BY {}",
+                stmt.group_by.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", "),
+            ));
         }
 
         if let Some(having) = &stmt.having {
@@ -120,37 +165,48 @@ impl Transpiler {
     }
 
     fn insert(&mut self, stmt: &InsertStatement) -> Result<String, Error> {
-        if stmt.values.is_empty() {
-            return Err(Error::invalid_query("INSERT statement has no rows"));
-        }
+        let cols = stmt.columns.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", ");
 
-        let col_count = stmt.columns.len();
+        let body = match &stmt.body {
+            InsertBody::Values(rows) => {
+                if rows.is_empty() {
+                    return Err(Error::invalid_query("INSERT statement has no rows"));
+                }
 
-        for (i, row) in stmt.values.iter().enumerate() {
-            if row.len() != col_count {
-                return Err(Error::invalid_query(format!(
-                    "row {i} has {} values but {col_count} columns were specified",
-                    row.len(),
-                )));
-            }
-        }
+                let col_count = stmt.columns.len();
 
-        Ok(format!(
-            "INSERT INTO {} ({}) VALUES {}",
-            stmt.table.name,
-            stmt.columns.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", "),
-            stmt.values
-                .iter()
-                .map(|row| format!(
-                    "({})",
-                    row.iter()
-                        .map(|v| self.placeholder(v.clone(), false))
+                for (i, row) in rows.iter().enumerate() {
+                    if row.len() != col_count {
+                        return Err(Error::invalid_query(format!(
+                            "row {i} has {} values but {col_count} columns were specified",
+                            row.len(),
+                        )));
+                    }
+                }
+
+                format!(
+                    "VALUES {}",
+                    rows.iter()
+                        .map(|row| format!(
+                            "({})",
+                            row.iter()
+                                .map(|v| self.placeholder(v.clone(), false))
+                                .collect::<Vec<_>>()
+                                .join(", "),
+                        ))
                         .collect::<Vec<_>>()
                         .join(", "),
-                ))
-                .collect::<Vec<_>>()
-                .join(", "),
-        ))
+                )
+            }
+
+            InsertBody::Select(query) => self.select(query, false)?,
+        };
+
+        if cols.is_empty() {
+            Ok(format!("INSERT INTO {} {body}", stmt.table.name))
+        } else {
+            Ok(format!("INSERT INTO {} ({cols}) {body}", stmt.table.name))
+        }
     }
 
     fn update(&mut self, stmt: &UpdateStatement) -> Result<String, Error> {
@@ -185,6 +241,18 @@ impl Transpiler {
         }
 
         Ok(sql)
+    }
+
+    fn compound(&mut self, stmt: &CompoundSelect) -> Result<String, Error> {
+        let left = self.select(&stmt.left, false)?;
+        let right = self.select(&stmt.right, false)?;
+        let op = match stmt.operator {
+            SetOperator::UnionAll => "UNION ALL",
+            SetOperator::Union => "UNION",
+            SetOperator::Intersect => "INTERSECT",
+            SetOperator::Except => "EXCEPT",
+        };
+        Ok(format!("({left}) {op} ({right})"))
     }
 
     fn create_table(&mut self, stmt: &CreateTableStatement) -> Result<String, Error> {
@@ -403,7 +471,9 @@ impl Transpiler {
     fn expression(&mut self, expr: &Expression, inline: bool) -> String {
         match expr {
             Expression::Value(val) => self.placeholder(val.clone(), inline),
+
             Expression::Column(col) => col.name.clone(),
+
             Expression::BinaryOp { left, op, right } => format!(
                 "({} {} {})",
                 self.expression(left, inline),
@@ -417,6 +487,7 @@ impl Transpiler {
                 },
                 self.expression(right, inline),
             ),
+
             Expression::Function { name, args } => format!(
                 "{name}({})",
                 args.iter()
@@ -424,7 +495,9 @@ impl Transpiler {
                     .collect::<Vec<_>>()
                     .join(", "),
             ),
+
             Expression::Aggregate(agg) => self.aggregate(agg),
+
             Expression::Case { operand, when_then, else_result } => format!(
                 "CASE{} {} {} END",
                 operand
@@ -445,6 +518,114 @@ impl Transpiler {
                     .map(|e| format!("ELSE {}", self.expression(e, inline)))
                     .unwrap_or_default(),
             ),
+
+            Expression::Cast { expr, to } => {
+                format!("CAST({} AS {})", self.expression(expr, inline), self.column_type(to))
+            }
+
+            Expression::Window(wf) => self.window_function(wf, inline),
+
+            Expression::Subquery(query) => {
+                self.select(query, inline).unwrap_or_else(|_| "NULL".to_string())
+            }
+        }
+    }
+
+    fn window_function(&mut self, wf: &WindowFunction, inline: bool) -> String {
+        format!("{} OVER ({})", self.window_func(&wf.func), self.window_spec(&wf.over, inline))
+    }
+
+    fn window_func(&self, func: &WindowFunc) -> String {
+        match func {
+            WindowFunc::RowNumber => "row_number()".to_string(),
+            WindowFunc::Rank => "rank()".to_string(),
+            WindowFunc::DenseRank => "dense_rank()".to_string(),
+            WindowFunc::PercentRank => "percent_rank()".to_string(),
+            WindowFunc::CumeDist => "cume_dist()".to_string(),
+            WindowFunc::Ntile(n) => format!("ntile({n})"),
+            WindowFunc::FirstValue(col) => format!("first_value({})", col.name),
+            WindowFunc::LastValue(col) => format!("last_value({})", col.name),
+            WindowFunc::NthValue { column, n } => format!("nth_value({}, {n})", column.name),
+            WindowFunc::Lag { column, offset, default } => {
+                match (offset, default) {
+                    (None, None) => format!("lagInFrame({})", column.name),
+                    (Some(o), None) => format!("lagInFrame({}, {o})", column.name),
+                    (Some(o), Some(d)) => format!("lagInFrame({}, {o}, {})", column.name, d.to_sql()),
+                    (None, Some(d)) => format!("lagInFrame({}, 1, {})", column.name, d.to_sql()),
+                }
+            }
+            WindowFunc::Lead { column, offset, default } => {
+                match (offset, default) {
+                    (None, None) => format!("leadInFrame({})", column.name),
+                    (Some(o), None) => format!("leadInFrame({}, {o})", column.name),
+                    (Some(o), Some(d)) => format!("leadInFrame({}, {o}, {})", column.name, d.to_sql()),
+                    (None, Some(d)) => format!("leadInFrame({}, 1, {})", column.name, d.to_sql()),
+                }
+            }
+        }
+    }
+
+    fn window_spec(&mut self, spec: &WindowSpec, inline: bool) -> String {
+        let mut parts = Vec::new();
+
+        if !spec.partition_by.is_empty() {
+            parts.push(format!(
+                "PARTITION BY {}",
+                spec.partition_by.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", "),
+            ));
+        }
+
+        if !spec.order_by.is_empty() {
+            parts.push(format!(
+                "ORDER BY {}",
+                spec.order_by
+                    .iter()
+                    .map(|o| format!(
+                        "{} {}{}",
+                        o.column.name,
+                        match o.direction {
+                            OrderDirection::Asc => "ASC",
+                            OrderDirection::Desc => "DESC",
+                        },
+                        match &o.nulls {
+                            Some(NullsOrder::First) => " NULLS FIRST",
+                            Some(NullsOrder::Last) => " NULLS LAST",
+                            None => "",
+                        },
+                    ))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            ));
+        }
+
+        if let Some(frame) = &spec.frame {
+            let unit = match frame.unit {
+                FrameUnit::Rows => "ROWS",
+                FrameUnit::Range => "RANGE",
+                FrameUnit::Groups => "GROUPS",
+            };
+            let frame_sql = match &frame.end {
+                None => format!("{unit} {}", self.frame_bound(&frame.start)),
+                Some(end) => format!(
+                    "{unit} BETWEEN {} AND {}",
+                    self.frame_bound(&frame.start),
+                    self.frame_bound(end),
+                ),
+            };
+            parts.push(frame_sql);
+        }
+
+        let _ = inline;
+        parts.join(" ")
+    }
+
+    fn frame_bound(&self, bound: &FrameBound) -> String {
+        match bound {
+            FrameBound::UnboundedPreceding => "UNBOUNDED PRECEDING".to_string(),
+            FrameBound::Preceding(n) => format!("{n} PRECEDING"),
+            FrameBound::CurrentRow => "CURRENT ROW".to_string(),
+            FrameBound::Following(n) => format!("{n} FOLLOWING"),
+            FrameBound::UnboundedFollowing => "UNBOUNDED FOLLOWING".to_string(),
         }
     }
 
@@ -490,6 +671,7 @@ impl Transpiler {
             Statement::CreateView(s) => self.create_view(s),
             Statement::CreateMaterializedView(s) => self.create_materialized_view(s),
             Statement::DropView(s) => self.drop_view(s),
+            Statement::Compound(s) => self.compound(s),
             Statement::Raw(sql, params) => {
                 self.params.extend(params.iter().cloned());
                 Ok(sql.clone())
@@ -512,43 +694,87 @@ impl Transpiler {
             ConditionExpression::Gte(col, val) => format!("{} >= {}", col.name, self.placeholder(val.clone(), inline)),
             ConditionExpression::Lt(col, val) => format!("{} < {}", col.name, self.placeholder(val.clone(), inline)),
             ConditionExpression::Lte(col, val) => format!("{} <= {}", col.name, self.placeholder(val.clone(), inline)),
+
             ConditionExpression::In(col, vals) => format!(
                 "{} IN ({})",
                 col.name,
                 vals.iter().map(|v| self.placeholder(v.clone(), inline)).collect::<Vec<_>>().join(", "),
             ),
+
             ConditionExpression::NotIn(col, vals) => format!(
                 "{} NOT IN ({})",
                 col.name,
                 vals.iter().map(|v| self.placeholder(v.clone(), inline)).collect::<Vec<_>>().join(", "),
             ),
+
             ConditionExpression::IsNull(col) => format!("{} IS NULL", col.name),
             ConditionExpression::IsNotNull(col) => format!("{} IS NOT NULL", col.name),
+
             ConditionExpression::Like(col, pattern) => {
                 format!("{} LIKE {}", col.name, self.placeholder(Value::String(pattern.clone()), inline))
             }
+
             ConditionExpression::NotLike(col, pattern) => {
                 format!("{} NOT LIKE {}", col.name, self.placeholder(Value::String(pattern.clone()), inline))
             }
+
             ConditionExpression::Between(col, low, high) => format!(
                 "{} BETWEEN {} AND {}",
                 col.name,
                 self.placeholder(low.clone(), inline),
                 self.placeholder(high.clone(), inline),
             ),
+
             ConditionExpression::NotBetween(col, low, high) => format!(
                 "{} NOT BETWEEN {} AND {}",
                 col.name,
                 self.placeholder(low.clone(), inline),
                 self.placeholder(high.clone(), inline),
             ),
+
             ConditionExpression::And(left, right) => {
                 format!("({} AND {})", self.condition(left, inline), self.condition(right, inline))
             }
+
             ConditionExpression::Or(left, right) => {
                 format!("({} OR {})", self.condition(left, inline), self.condition(right, inline))
             }
+
             ConditionExpression::Not(inner) => format!("NOT ({})", self.condition(inner, inline)),
+
+            ConditionExpression::Compare(left, op, right) => format!(
+                "{} {} {}",
+                self.expression(left, inline),
+                match op {
+                    ComparisonOp::Eq => "=",
+                    ComparisonOp::Ne => "!=",
+                    ComparisonOp::Gt => ">",
+                    ComparisonOp::Gte => ">=",
+                    ComparisonOp::Lt => "<",
+                    ComparisonOp::Lte => "<=",
+                },
+                self.expression(right, inline),
+            ),
+
+            ConditionExpression::InSubquery(col, query) => {
+                let sql = self.select(query, inline).unwrap_or_default();
+                format!("{} IN ({sql})", col.name)
+            }
+
+            ConditionExpression::NotInSubquery(col, query) => {
+                let sql = self.select(query, inline).unwrap_or_default();
+                format!("{} NOT IN ({sql})", col.name)
+            }
+
+            ConditionExpression::Exists(query) => {
+                let sql = self.select(query, inline).unwrap_or_default();
+                format!("EXISTS ({sql})")
+            }
+
+            ConditionExpression::NotExists(query) => {
+                let sql = self.select(query, inline).unwrap_or_default();
+                format!("NOT EXISTS ({sql})")
+            }
         }
     }
 }

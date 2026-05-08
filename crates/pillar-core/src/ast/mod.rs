@@ -1,14 +1,20 @@
 pub mod refs;
+pub mod expression;
 pub mod mutation;
 pub mod schema;
 pub mod select;
 pub mod ttl;
+pub mod window;
+pub mod compound;
 
 pub use refs::*;
+pub use expression::*;
 pub use mutation::*;
 pub use schema::*;
 pub use select::*;
 pub use ttl::*;
+pub use window::*;
+pub use compound::*;
 
 use crate::value::Value;
 
@@ -38,6 +44,8 @@ pub enum Statement {
     CreateMaterializedView(CreateMaterializedViewStatement),
     /// A `DROP VIEW` statement.
     DropView(DropViewStatement),
+    /// A compound set operation (`UNION`, `INTERSECT`, `EXCEPT`).
+    Compound(CompoundSelect),
     /// A raw SQL string with positional bind parameters.
     Raw(String, Vec<Value>),
 }
@@ -96,6 +104,11 @@ impl Statement {
     /// Creates a [`Statement::DropView`](crate::ast::Statement::DropView) from the given statement.
     pub fn drop_view(stmt: DropViewStatement) -> Self {
         Self::DropView(stmt)
+    }
+
+    /// Creates a [`Statement::Compound`](crate::ast::Statement::Compound) from the given compound select.
+    pub fn compound(stmt: CompoundSelect) -> Self {
+        Self::Compound(stmt)
     }
 
     /// Creates a [`Statement::Raw`](crate::ast::Statement::Raw) from a SQL string with positional bind parameters.

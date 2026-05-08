@@ -1,8 +1,25 @@
 use crate::{
-    ast::refs::ColumnRef,
+    ast::{refs::ColumnRef, expression::Expression, select::SelectStatement},
     value::Value,
 };
 
+
+/// A comparison operator used in a [`Compare`](crate::condition::ConditionExpression::Compare) condition.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ComparisonOp {
+    /// `=`
+    Eq,
+    /// `!=`
+    Ne,
+    /// `>`
+    Gt,
+    /// `>=`
+    Gte,
+    /// `<`
+    Lt,
+    /// `<=`
+    Lte,
+}
 
 /// A single SQL condition predicate used in WHERE and HAVING clauses.
 #[derive(Debug, Clone, PartialEq)]
@@ -41,6 +58,16 @@ pub enum ConditionExpression {
     Or(Box<ConditionExpression>, Box<ConditionExpression>),
     /// The condition must be false.
     Not(Box<ConditionExpression>),
+    /// Compares two arbitrary expressions with the given operator.
+    Compare(Expression, ComparisonOp, Expression),
+    /// Column value is in the result set of a subquery.
+    InSubquery(ColumnRef, Box<SelectStatement>),
+    /// Column value is not in the result set of a subquery.
+    NotInSubquery(ColumnRef, Box<SelectStatement>),
+    /// The subquery returns at least one row (EXISTS).
+    Exists(Box<SelectStatement>),
+    /// The subquery returns no rows (NOT EXISTS).
+    NotExists(Box<SelectStatement>),
 }
 
 impl ConditionExpression {
@@ -127,6 +154,35 @@ impl ConditionExpression {
     /// Negates this expression with `NOT`.
     pub fn not(self) -> Self {
         ConditionExpression::Not(Box::new(self))
+    }
+
+    /// Compares two arbitrary expressions with the given operator.
+    pub fn compare(
+        left: impl Into<Expression>,
+        op: ComparisonOp,
+        right: impl Into<Expression>,
+    ) -> Self {
+        ConditionExpression::Compare(left.into(), op, right.into())
+    }
+
+    /// Creates a `column IN (subquery)` condition.
+    pub fn in_subquery(column: impl Into<ColumnRef>, query: SelectStatement) -> Self {
+        ConditionExpression::InSubquery(column.into(), Box::new(query))
+    }
+
+    /// Creates a `column NOT IN (subquery)` condition.
+    pub fn not_in_subquery(column: impl Into<ColumnRef>, query: SelectStatement) -> Self {
+        ConditionExpression::NotInSubquery(column.into(), Box::new(query))
+    }
+
+    /// Creates an `EXISTS (subquery)` condition.
+    pub fn exists(query: SelectStatement) -> Self {
+        ConditionExpression::Exists(Box::new(query))
+    }
+
+    /// Creates a `NOT EXISTS (subquery)` condition.
+    pub fn not_exists(query: SelectStatement) -> Self {
+        ConditionExpression::NotExists(Box::new(query))
     }
 }
 

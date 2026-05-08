@@ -87,6 +87,7 @@ impl<M: Migrations> MigrationRunner<M> {
                         OnConflict::new(OnConflictAction::do_update([
                             ("revision_id", Value::string(revision_id))
                         ]))
+                        .target(["revision_id"])
                     )
             ))
             .await?;
