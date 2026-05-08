@@ -86,6 +86,9 @@ pub struct ViewAttrs {
     pub partition_by: Option<String>,
     /// Catch-all for backend-specific options not covered by named fields.
     pub options: Option<std::collections::HashMap<String, String>>,
+    /// Emits a `CREATE MATERIALIZED VIEW` statement instead of `CREATE VIEW`.
+    #[darling(default)]
+    pub materialized: bool,
 }
 
 #[derive(Clone, FromField)]

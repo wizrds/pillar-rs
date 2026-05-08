@@ -51,7 +51,7 @@ fn view_struct(view_name: &str, fields: &[FieldAttrs], attrs: &ViewAttrs) -> syn
             #(#struct_fields),*
         }
 
-        impl ::pillar::view::MaterializedView for View {
+        impl ::pillar::view::View for View {
             fn view_name() -> &'static str {
                 #view_name
             }
@@ -159,15 +159,14 @@ fn aggregate_projection(op: &AggregateOp, source: &str) -> TokenStream {
 }
 
 fn view_schema_impl(fields: &[FieldAttrs], attrs: &ViewAttrs) -> syn::Result<TokenStream> {
-    let has_overrides = attrs.to.is_some()
+    let has_ddl = attrs.materialized
+        || attrs.to.is_some()
         || attrs.engine.is_some()
         || attrs.partition_by.is_some()
         || attrs.options.as_ref().map(|o| !o.is_empty()).unwrap_or(false);
 
-    if !has_overrides {
-        return Ok(quote! {
-            impl ::pillar::query::ViewSchema for View {}
-        });
+    if !has_ddl {
+        return Ok(quote! {});
     }
 
     let order_by_fields: Vec<String> = fields.iter()
@@ -202,23 +201,40 @@ fn view_schema_impl(fields: &[FieldAttrs], attrs: &ViewAttrs) -> syn::Result<Tok
         }
     }
 
-    let to_table_call = match &attrs.to {
-        Some(t) => quote! { .to_table(#t) },
-        None => quote! {},
+    let create_stmt = if attrs.materialized || attrs.to.is_some() || attrs.engine.is_some() {
+        let to_table_call = match &attrs.to {
+            Some(t) => quote! { .to_table(#t) },
+            None => quote! {},
+        };
+
+        quote! {
+            ::pillar::ast::Statement::CreateMaterializedView(
+                ::pillar::ast::CreateMaterializedViewStatement::new(
+                    Self::view_name(),
+                    <Self as ::pillar::view::ViewQuery>::query(),
+                )
+                .if_not_exists()
+                #to_table_call
+                #option_calls
+            )
+        }
+    } else {
+        quote! {
+            ::pillar::ast::Statement::CreateView(
+                ::pillar::ast::CreateViewStatement::new(
+                    Self::view_name(),
+                    <Self as ::pillar::view::ViewQuery>::query(),
+                )
+                .if_not_exists()
+                #option_calls
+            )
+        }
     };
 
     Ok(quote! {
         impl ::pillar::query::ViewSchema for View {
             fn create_statement() -> ::pillar::ast::Statement {
-                ::pillar::ast::Statement::CreateMaterializedView(
-                    ::pillar::ast::CreateMaterializedViewStatement::new(
-                        Self::view_name(),
-                        <Self as ::pillar::view::ViewQuery>::query(),
-                    )
-                    .if_not_exists()
-                    #to_table_call
-                    #option_calls
-                )
+                #create_stmt
             }
         }
     })

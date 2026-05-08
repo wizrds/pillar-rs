@@ -317,9 +317,9 @@ let stmt = Statement::insert(
 
 Everything that compiles against the AST works on both DuckDB and ClickHouse. Features with no equivalent on a given backend are either mapped to the closest available construct or silently omitted (for example, DuckDB maps ClickHouse TTL to a no-op, and ClickHouse does not emit `RETURNING` clauses).
 
-### Materialized views
+### Views
 
-Define a materialized view with `#[derive(MaterializedView)]`. The macro generates a `View` struct and a `Column` struct, parallel to how `Model` works.
+Define a view with `#[derive(View)]`. The macro generates a `View` struct and a `Column` struct, parallel to how `Model` works. Add `materialized` to emit `CREATE MATERIALIZED VIEW` instead of `CREATE VIEW`.
 
 #### Simple pass-through view
 
@@ -329,7 +329,7 @@ Use `from` and `filter` to bake a query into the view definition:
 pub mod high_severity_events {
     use pillar::prelude::*;
 
-    #[derive(MaterializedView)]
+    #[derive(View)]
     #[pillar(view = "high_severity_events", from = "events", filter = "severity >= 3")]
     pub struct HighSeverityEvent {
         pub id: uuid::Uuid,
@@ -348,9 +348,10 @@ Mark aggregate fields with `#[pillar(aggregate = "...")]`. Non-aggregate fields 
 pub mod events_by_minute {
     use pillar::prelude::*;
 
-    #[derive(MaterializedView)]
+    #[derive(View)]
     #[pillar(
         view = "events_by_minute_mv",
+        materialized,
         from = "events",
         to = "events_by_minute",
         engine = "SummingMergeTree",
@@ -378,6 +379,7 @@ Valid `aggregate` values: `"count"`, `"sum"`, `"avg"`, `"min"`, `"max"`.
 | Attribute | Type | Description |
 |---|---|---|
 | `view` | `String` | View name. Defaults to the snake_case struct name. |
+| `materialized` | flag | Emits `CREATE MATERIALIZED VIEW` instead of `CREATE VIEW`. |
 | `from` | `String` | Source table for the auto-generated `ViewQuery` impl. |
 | `filter` | `String` | Optional WHERE filter on the generated query. |
 | `to` | `String` | Routes MV output to this table (ClickHouse `TO table`). Ignored by DuckDB. |
@@ -398,7 +400,7 @@ Valid `aggregate` values: `"count"`, `"sum"`, `"avg"`, `"min"`, `"max"`.
 
 #### Schema provisioning
 
-`ViewSchema::create_statement()` is available on all views. The blanket impl emits a plain `CREATE MATERIALIZED VIEW`. When `to`, `engine`, `partition_by`, or `options` are set, the macro generates an explicit override that includes those backend-specific details.
+`ViewSchema::create_statement()` is available when any DDL attribute (`materialized`, `engine`, `partition_by`, `to`, or `options`) is set, or when `ViewSchema` is implemented manually.
 
 ```rust
 database.execute(&events_by_minute::View::create_statement()).await?;
@@ -439,7 +441,7 @@ let results = high_severity_events::View::find()
 
 ### Typed column accessors
 
-Every `Model` and `MaterializedView` gets a `Column` struct with a typed accessor per field:
+Every `Model` and `View` gets a `Column` struct with a typed accessor per field:
 
 ```rust
 events::Column::severity().eq(3i32)

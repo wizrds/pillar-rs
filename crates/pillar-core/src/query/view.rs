@@ -4,7 +4,7 @@ use crate::{
     errors::Error,
     ast::{
         ColumnRef,
-        CreateMaterializedViewStatement,
+        CreateViewStatement,
         OrderBy,
         Projection,
         SelectStatement,
@@ -13,17 +13,17 @@ use crate::{
     },
     condition::{Condition, ConditionExpression},
     database::Database,
-    view::{MaterializedView, ViewQuery},
+    view::{View, ViewQuery},
 };
 
 
-/// A builder for a `SELECT` query targeting a [`MaterializedView`](crate::view::MaterializedView).
-pub struct SelectView<V: MaterializedView> {
+/// A builder for a `SELECT` query targeting a [`View`](crate::view::View).
+pub struct SelectView<V: View> {
     statement: SelectStatement,
     _marker: std::marker::PhantomData<V>,
 }
 
-impl<V: MaterializedView> SelectView<V> {
+impl<V: View> SelectView<V> {
     /// Creates a new [`SelectView`](crate::query::SelectView) selecting all columns.
     pub fn new() -> Self {
         Self {
@@ -121,30 +121,29 @@ impl<V: MaterializedView> SelectView<V> {
     }
 }
 
-impl<V: MaterializedView> Default for SelectView<V> {
+impl<V: View> Default for SelectView<V> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// Provides a `find` entry point for any type implementing [`MaterializedView`](crate::view::MaterializedView).
-pub trait ViewOps: MaterializedView + Sized {
+/// Provides a `find` entry point for any type implementing [`View`](crate::view::View).
+pub trait ViewOps: View + Sized {
     /// Returns a new [`SelectView`](crate::query::SelectView) for this view.
     fn find() -> SelectView<Self> {
         SelectView::new()
     }
 }
 
-impl<V: MaterializedView> ViewOps for V {}
+impl<V: View> ViewOps for V {}
 
-/// A [`MaterializedView`](crate::view::MaterializedView) that can produce the DDL statement needed to create itself.
+/// A [`View`](crate::view::View) that can produce the DDL statement needed to create itself.
 pub trait ViewSchema: ViewQuery + Sized {
-    /// Returns a [`Statement`](crate::ast::Statement) that creates this materialized view.
+    /// Returns a [`Statement`](crate::ast::Statement) that creates this view.
     fn create_statement() -> Statement {
-        Statement::CreateMaterializedView(
-            CreateMaterializedViewStatement::new(Self::view_name(), Self::query())
+        Statement::CreateView(
+            CreateViewStatement::new(Self::view_name(), Self::query())
                 .if_not_exists(),
         )
     }
 }
-

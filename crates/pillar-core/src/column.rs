@@ -9,7 +9,7 @@ use crate::{
 };
 
 
-/// Compile-time metadata for a single column on a [`Model`](crate::model::Model) or [`MaterializedView`](crate::view::MaterializedView).
+/// Compile-time metadata for a single column on a [`Model`](crate::model::Model) or [`View`](crate::view::View).
 #[derive(Debug, Clone)]
 pub struct ColumnDef {
     pub name: &'static str,
