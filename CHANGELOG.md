@@ -1,6 +1,16 @@
 # Changelog
 
 ---
+## [0.2.0](https://github.com/wizrds/pillar-rs/-/compare/0.1.2...0.2.0) - 2026-05-08
+
+### Features
+
+- Change material views to views and add 'materialized' option to macro - ([a1eee0d](https://github.com/wizrds/pillar-rs/-/commit/a1eee0dd231fa8b8be775c4409f6a423b58d33eb)) - Timothy Pogue
+
+### Miscellaneous
+
+- Update README - ([5520d8b](https://github.com/wizrds/pillar-rs/-/commit/5520d8b83365cb4d3acd0326f996595a2cf57bcb)) - Timothy Pogue
+---
 ## [0.1.2](https://github.com/wizrds/pillar-rs/-/compare/0.1.1...0.1.2) - 2026-05-08
 
 ### Bug Fixes
