@@ -253,6 +253,70 @@ events::Model::delete()
 events::Model::delete_all().execute(&database).await?;
 ```
 
+### Advanced queries
+
+When the model API is not expressive enough you can build a `Statement` directly using the AST and execute it with `database.query(...)` or `database.execute(...)`. The AST is fully fluent:
+
+```rust
+use pillar::prelude::*;
+
+// CTEs
+let stmt = Statement::select(
+    SelectStatement::new("ranked")
+        .with(Cte::new("ranked",
+            SelectStatement::new("events")
+                .projections([
+                    Projection::column("id"),
+                    Projection::column("severity"),
+                    Projection::expr(Expression::window(
+                        WindowFunction::rank(
+                            WindowSpec::new()
+                                .partition_by(["host"])
+                                .order_by([OrderBy::desc("severity")]),
+                        ),
+                    )).alias("rnk"),
+                ])
+        ))
+        .where_clause(ConditionExpression::lte("rnk", 3i32))
+);
+
+// Subqueries
+let stmt = Statement::select(
+    SelectStatement::new("events")
+        .where_clause(ConditionExpression::in_subquery(
+            "job_id",
+            SelectStatement::new("active_jobs")
+                .projections([Projection::column("id")]),
+        ))
+);
+
+// UNION / INTERSECT / EXCEPT
+let stmt = Statement::compound(CompoundSelect::union_all(
+    SelectStatement::new("events_2023"),
+    SelectStatement::new("events_2024"),
+));
+
+// INSERT ... SELECT
+let stmt = Statement::insert(
+    InsertStatement::new("archive")
+        .columns(["id", "name"])
+        .select(
+            SelectStatement::new("events")
+                .where_clause(ConditionExpression::lt("severity", 2i32)),
+        )
+);
+
+// RETURNING
+let stmt = Statement::insert(
+    InsertStatement::new("events")
+        .columns(["name", "severity"])
+        .values([[Value::string("login"), Value::Int32(1)]])
+        .returning([Projection::column("id")])
+);
+```
+
+Everything that compiles against the AST works on both DuckDB and ClickHouse. Features with no equivalent on a given backend are either mapped to the closest available construct or silently omitted (for example, DuckDB maps ClickHouse TTL to a no-op, and ClickHouse does not emit `RETURNING` clauses).
+
 ### Materialized views
 
 Define a materialized view with `#[derive(MaterializedView)]`. The macro generates a `View` struct and a `Column` struct, parallel to how `Model` works.
