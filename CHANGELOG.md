@@ -1,6 +1,12 @@
 # Changelog
 
 ---
+## [0.2.2](https://github.com/wizrds/pillar-rs/-/compare/0.2.1...0.2.2) - 2026-05-09
+
+### Bug Fixes
+
+- **(duckdb)** Wrap Merge aggregates in ANY_VALUE and remove GROUP BY suppression - ([08559af](https://github.com/wizrds/pillar-rs/-/commit/08559af6bc4da31d117acf645e65f01da6607fe5)) - Timothy Pogue
+---
 ## [0.2.1](https://github.com/wizrds/pillar-rs/-/compare/0.2.0...0.2.1) - 2026-05-09
 
 ### Bug Fixes
