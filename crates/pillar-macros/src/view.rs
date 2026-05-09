@@ -210,7 +210,7 @@ fn view_schema_impl(fields: &[FieldAttrs], attrs: &ViewAttrs) -> syn::Result<Tok
         quote! {
             ::pillar::ast::Statement::CreateMaterializedView(
                 ::pillar::ast::CreateMaterializedViewStatement::new(
-                    Self::view_name(),
+                    <Self as ::pillar::view::View>::view_name(),
                     <Self as ::pillar::view::ViewQuery>::query(),
                 )
                 .if_not_exists()
@@ -222,7 +222,7 @@ fn view_schema_impl(fields: &[FieldAttrs], attrs: &ViewAttrs) -> syn::Result<Tok
         quote! {
             ::pillar::ast::Statement::CreateView(
                 ::pillar::ast::CreateViewStatement::new(
-                    Self::view_name(),
+                    <Self as ::pillar::view::View>::view_name(),
                     <Self as ::pillar::view::ViewQuery>::query(),
                 )
                 .if_not_exists()
