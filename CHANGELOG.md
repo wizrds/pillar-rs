@@ -1,6 +1,16 @@
 # Changelog
 
 ---
+## [0.2.1](https://github.com/wizrds/pillar-rs/-/compare/0.2.0...0.2.1) - 2026-05-09
+
+### Bug Fixes
+
+- **(macros)** Use fully qualified path to view name method to avoid conflicts - ([1855ea0](https://github.com/wizrds/pillar-rs/-/commit/1855ea0d43939288532f4a43731d87d3f3395ee8)) - Timothy Pogue
+
+### Miscellaneous
+
+- Update README - ([0f9de97](https://github.com/wizrds/pillar-rs/-/commit/0f9de97a8cdd8e2977f57b5a12f73884a3b3a75f)) - Timothy Pogue
+---
 ## [0.2.0](https://github.com/wizrds/pillar-rs/-/compare/0.1.2...0.2.0) - 2026-05-08
 
 ### Features
