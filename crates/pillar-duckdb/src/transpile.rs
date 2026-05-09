@@ -115,7 +115,7 @@ impl Transpiler {
             sql.push_str(&format!(" WHERE {}", self.condition(where_clause, inline)));
         }
 
-        if !stmt.group_by.is_empty() && !self.has_merge_projections(&stmt.projections) {
+        if !stmt.group_by.is_empty() {
             sql.push_str(&format!(
                 " GROUP BY {}",
                 stmt.group_by.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", "),
@@ -645,7 +645,7 @@ impl Transpiler {
     }
 
     fn merge_column(&self, inner: &AggregateFunction) -> String {
-        match inner {
+        format!("ANY_VALUE({})", match inner {
             AggregateFunction::Count(CountArg::Column(col)) => col.name.clone(),
             AggregateFunction::Count(CountArg::Distinct(col)) => col.name.clone(),
             AggregateFunction::Sum(col) => col.name.clone(),
@@ -657,19 +657,7 @@ impl Transpiler {
             AggregateFunction::Quantile { column, .. } => column.name.clone(),
             AggregateFunction::TopK { column, .. } => column.name.clone(),
             AggregateFunction::Histogram { column, .. } => column.name.clone(),
-            // Fallback: emit the plain aggregate
-            _ => self.aggregate(inner),
-        }
-    }
-
-    fn has_merge_projections(&self, projections: &[Projection]) -> bool {
-        projections.iter().any(|p| match p {
-            Projection::Aggregate(AggregateFunction::Merge(_)) => true,
-            Projection::Aliased(inner, _) => matches!(
-                inner.as_ref(),
-                Projection::Aggregate(AggregateFunction::Merge(_))
-            ),
-            _ => false,
+            _ => return self.aggregate(inner),
         })
     }
 
@@ -1034,7 +1022,72 @@ mod tests {
                     Projection::aggregate(AggregateFunction::merge(AggregateFunction::avg("duration_ms"))),
                 ]),
         ));
-        assert_eq!(sql, "SELECT CAST(COUNT(*) AS UBIGINT), duration_ms FROM events");
+        assert_eq!(sql, "SELECT CAST(COUNT(*) AS UBIGINT), ANY_VALUE(duration_ms) FROM events");
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn test_merge_projections_with_group_by() {
+        let (sql, params) = transpile(Statement::select(
+            SelectStatement::new("crawl_log_latency")
+                .projections([
+                    Projection::column("tenant_id"),
+                    Projection::column("bucket"),
+                    Projection::aggregate(
+                        AggregateFunction::merge(AggregateFunction::quantile(0.5, "latency_p50"))
+                    ).alias("latency_p50"),
+                    Projection::aggregate(
+                        AggregateFunction::merge(AggregateFunction::sum("latency_sum"))
+                    ).alias("latency_sum"),
+                ])
+                .group_by(["tenant_id", "bucket"]),
+        ));
+
+        assert_eq!(
+            sql,
+            "SELECT tenant_id, bucket, ANY_VALUE(latency_p50) AS latency_p50, ANY_VALUE(latency_sum) AS latency_sum FROM crawl_log_latency GROUP BY tenant_id, bucket",
+        );
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn test_mixed_merge_and_aggregate_with_group_by() {
+        let (sql, params) = transpile(Statement::select(
+            SelectStatement::new("crawl_log_latency")
+                .projections([
+                    Projection::column("tenant_id"),
+                    Projection::column("step"),
+                    Projection::aggregate(
+                        AggregateFunction::merge(AggregateFunction::quantile(0.5, "latency_p50"))
+                    ).alias("latency_p50"),
+                    Projection::aggregate(AggregateFunction::sum("latency_sum")).alias("latency_sum"),
+                    Projection::aggregate(AggregateFunction::count_all()).alias("event_count"),
+                ])
+                .group_by(["tenant_id", "step"]),
+        ));
+
+        assert_eq!(
+            sql,
+            "SELECT tenant_id, step, ANY_VALUE(latency_p50) AS latency_p50, CAST(SUM(latency_sum) AS UBIGINT) AS latency_sum, CAST(COUNT(*) AS UBIGINT) AS event_count FROM crawl_log_latency GROUP BY tenant_id, step",
+        );
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn test_merge_projections_no_group_by() {
+        let (sql, params) = transpile(Statement::select(
+            SelectStatement::new("crawl_log_latency")
+                .projections([
+                    Projection::aggregate(
+                        AggregateFunction::merge(AggregateFunction::sum("latency_sum"))
+                    ).alias("latency_sum"),
+                ]),
+        ));
+
+        assert_eq!(
+            sql,
+            "SELECT ANY_VALUE(latency_sum) AS latency_sum FROM crawl_log_latency",
+        );
         assert!(params.is_empty());
     }
 
