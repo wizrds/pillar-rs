@@ -18,6 +18,7 @@ use crate::{
 
 
 /// A builder for a `SELECT` query targeting a [`View`](crate::view::View).
+#[derive(Debug, Clone)]
 pub struct SelectView<V: View> {
     statement: SelectStatement,
     _marker: std::marker::PhantomData<V>,

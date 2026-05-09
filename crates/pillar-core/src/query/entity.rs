@@ -27,6 +27,7 @@ use crate::{
 
 
 /// A builder for a `SELECT` query targeting a [`Model`](crate::model::Model) table.
+#[derive(Debug, Clone)]
 pub struct SelectEntity<M: Model> {
     statement: SelectStatement,
     _marker: std::marker::PhantomData<M>,
@@ -87,6 +88,18 @@ impl<M: Model> SelectEntity<M> {
     {
         if condition {
             f(self)
+        } else {
+            self
+        }
+    }
+
+    /// Applies a filter if the given `Option` is `Some`, using the contained value.
+    pub fn filter_if_some<F, T>(self, condition: Option<T>, f: F) -> Self
+    where
+        F: FnOnce(Self, T) -> Self,
+    {
+        if let Some(value) = condition {
+            f(self, value)
         } else {
             self
         }
@@ -257,6 +270,7 @@ impl<M: Model> Default for SelectEntity<M> {
 
 
 /// A builder for an `INSERT` statement targeting a [`Model`](crate::model::Model) table.
+#[derive(Debug, Clone)]
 pub struct InsertEntity<M: Model> {
     statement: InsertStatement,
     _marker: std::marker::PhantomData<M>,
@@ -308,6 +322,7 @@ impl<M: Model> InsertEntity<M> {
 
 
 /// A builder for an `UPDATE` statement targeting a [`Model`](crate::model::Model) table.
+#[derive(Debug, Clone)]
 pub struct UpdateEntity<M: Model> {
     statement: UpdateStatement,
     _marker: std::marker::PhantomData<M>,
@@ -369,14 +384,17 @@ impl<M: Model> Default for UpdateEntity<M> {
 
 
 /// Marker type indicating a [`DeleteEntity`](crate::query::DeleteEntity) has a WHERE clause or explicit all-rows intent.
+#[derive(Debug, Clone)]
 pub struct Filtered;
 /// Marker type indicating a [`DeleteEntity`](crate::query::DeleteEntity) has not yet been given a filter.
+#[derive(Debug, Clone)]
 pub struct Unfiltered;
 
 /// A builder for a `DELETE` statement targeting a [`Model`](crate::model::Model) table.
 ///
 /// Requires an explicit filter or `all()` call before execution, enforced at compile time via the
 /// `S` type parameter.
+#[derive(Debug, Clone)]
 pub struct DeleteEntity<M: Model, S = Unfiltered> {
     statement: DeleteStatement,
     _marker: std::marker::PhantomData<(M, S)>,
