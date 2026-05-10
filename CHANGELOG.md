@@ -1,6 +1,12 @@
 # Changelog
 
 ---
+## [0.3.3](https://github.com/wizrds/pillar-rs/-/compare/0.3.2...0.3.3) - 2026-05-10
+
+### Bug Fixes
+
+- Add time bucket expression - ([9debed7](https://github.com/wizrds/pillar-rs/-/commit/9debed747ab90e9aa5d0599a6030f3169c17bc4a)) - Timothy Pogue
+---
 ## [0.3.2](https://github.com/wizrds/pillar-rs/-/compare/0.3.1...0.3.2) - 2026-05-10
 
 ### Bug Fixes
