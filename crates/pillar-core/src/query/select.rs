@@ -54,6 +54,12 @@ impl<T: FromBatch> Select<T> {
         }
     }
 
+    /// Appends a single projection.
+    pub fn projection(mut self, projection: Projection) -> Self {
+        self.statement = self.statement.projection(projection);
+        self
+    }
+
     /// Replaces the projection list with the given columns.
     pub fn columns<I, C>(mut self, columns: I) -> Self
     where
