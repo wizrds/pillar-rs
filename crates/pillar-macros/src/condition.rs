@@ -8,18 +8,18 @@ pub fn parse_condition(input: &str) -> syn::Result<TokenStream> {
     if let Some((left, right)) = split_binary(input, " AND ") {
         let l = parse_condition(left)?;
         let r = parse_condition(right)?;
-        return Ok(quote! { ::pillar::condition::ConditionExpression::And(
-            ::std::boxed::Box::new(#l),
-            ::std::boxed::Box::new(#r),
+        return Ok(quote! { ::pillar::condition::ConditionExpression::and(
+            #l,
+            #r,
         )});
     }
 
     if let Some((left, right)) = split_binary(input, " OR ") {
         let l = parse_condition(left)?;
         let r = parse_condition(right)?;
-        return Ok(quote! { ::pillar::condition::ConditionExpression::Or(
-            ::std::boxed::Box::new(#l),
-            ::std::boxed::Box::new(#r),
+        return Ok(quote! { ::pillar::condition::ConditionExpression::or(
+            #l,
+            #r,
         )});
     }
 
@@ -46,12 +46,12 @@ pub fn parse_condition(input: &str) -> syn::Result<TokenStream> {
 
 // Operators ordered longest-first to avoid `>` matching before `>=`
 const OPERATORS: &[(&str, &str)] = &[
-    (">=", "Gte"),
-    ("<=", "Lte"),
-    ("!=", "Ne"),
-    ("=",  "Eq"),
-    (">",  "Gt"),
-    ("<",  "Lt"),
+    (">=", "gte"),
+    ("<=", "lte"),
+    ("!=", "ne"),
+    ("=",  "eq"),
+    (">",  "gt"),
+    ("<",  "lt"),
 ];
 
 fn split_binary<'a>(input: &'a str, op: &str) -> Option<(&'a str, &'a str)> {

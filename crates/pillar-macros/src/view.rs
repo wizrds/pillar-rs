@@ -91,7 +91,7 @@ fn view_query_impl(fields: &[FieldAttrs], attrs: &ViewAttrs) -> syn::Result<Toke
             .unwrap_or_else(|| f.ident.as_ref().unwrap().to_string());
 
         match &f.aggregate {
-            None => quote! { ::pillar::ast::Projection::Column(#col_name.to_string()) },
+            None => quote! { ::pillar::ast::Projection::column(#col_name.to_string()) },
             Some(op) => {
                 let source = f.source.as_deref().unwrap_or(&col_name);
                 aggregate_projection(op, source)

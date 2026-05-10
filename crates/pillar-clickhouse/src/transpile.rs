@@ -536,7 +536,7 @@ impl Transpiler {
             ),
 
             Expression::TimeBucket { interval, column } => format!(
-                "toDateTime(toStartOfInterval({}, INTERVAL {} {}))",
+                "toDateTime64(toStartOfInterval({}, INTERVAL {} {}), 0)",
                 column.name,
                 interval.value,
                 self.interval_unit(&interval.unit),
@@ -1161,7 +1161,7 @@ mod tests {
         ));
         assert_eq!(
             sql,
-            "SELECT toDateTime(toStartOfInterval(bucket, INTERVAL 5 MINUTE)) AS bucket FROM crawl_log_metrics GROUP BY bucket"
+            "SELECT toDateTime64(toStartOfInterval(bucket, INTERVAL 5 MINUTE), 0) AS bucket FROM crawl_log_metrics GROUP BY bucket"
         );
     }
 }
