@@ -354,4 +354,64 @@ impl SelectStatement {
         self.distinct = true;
         self
     }
+
+    /// Removes `DISTINCT` from the query.
+    pub fn clear_distinct(mut self) -> Self {
+        self.distinct = false;
+        self
+    }
+
+    /// Clears the projection list.
+    pub fn clear_projections(mut self) -> Self {
+        self.projections.clear();
+        self
+    }
+
+    /// Clears the WHERE clause.
+    pub fn clear_where(mut self) -> Self {
+        self.where_clause = None;
+        self
+    }
+
+    /// Clears all joins.
+    pub fn clear_joins(mut self) -> Self {
+        self.joins.clear();
+        self
+    }
+
+    /// Clears the GROUP BY list.
+    pub fn clear_group_by(mut self) -> Self {
+        self.group_by.clear();
+        self
+    }
+
+    /// Clears the HAVING clause.
+    pub fn clear_having(mut self) -> Self {
+        self.having = None;
+        self
+    }
+
+    /// Clears the ORDER BY list.
+    pub fn clear_order_by(mut self) -> Self {
+        self.order_by.clear();
+        self
+    }
+
+    /// Clears the LIMIT.
+    pub fn clear_limit(mut self) -> Self {
+        self.limit = None;
+        self
+    }
+
+    /// Clears the OFFSET.
+    pub fn clear_offset(mut self) -> Self {
+        self.offset = None;
+        self
+    }
+
+    /// Clears the WITH clause.
+    pub fn clear_with(mut self) -> Self {
+        self.with.clear();
+        self
+    }
 }

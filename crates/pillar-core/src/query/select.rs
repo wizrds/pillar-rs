@@ -175,6 +175,66 @@ impl<T: FromBatch> Select<T> {
         self
     }
 
+    /// Removes `DISTINCT` from the query.
+    pub fn clear_distinct(mut self) -> Self {
+        self.statement = self.statement.clear_distinct();
+        self
+    }
+
+    /// Clears the projection list.
+    pub fn clear_projections(mut self) -> Self {
+        self.statement = self.statement.clear_projections();
+        self
+    }
+
+    /// Clears the WHERE clause.
+    pub fn clear_where(mut self) -> Self {
+        self.statement = self.statement.clear_where();
+        self
+    }
+
+    /// Clears all joins.
+    pub fn clear_joins(mut self) -> Self {
+        self.statement = self.statement.clear_joins();
+        self
+    }
+
+    /// Clears the GROUP BY list.
+    pub fn clear_group_by(mut self) -> Self {
+        self.statement = self.statement.clear_group_by();
+        self
+    }
+
+    /// Clears the HAVING clause.
+    pub fn clear_having(mut self) -> Self {
+        self.statement = self.statement.clear_having();
+        self
+    }
+
+    /// Clears the ORDER BY list.
+    pub fn clear_order_by(mut self) -> Self {
+        self.statement = self.statement.clear_order_by();
+        self
+    }
+
+    /// Clears the LIMIT.
+    pub fn clear_limit(mut self) -> Self {
+        self.statement = self.statement.clear_limit();
+        self
+    }
+
+    /// Clears the OFFSET.
+    pub fn clear_offset(mut self) -> Self {
+        self.statement = self.statement.clear_offset();
+        self
+    }
+
+    /// Clears the WITH clause.
+    pub fn clear_with(mut self) -> Self {
+        self.statement = self.statement.clear_with();
+        self
+    }
+
     /// Appends an aggregate projection.
     pub fn aggregate(mut self, aggregate: AggregateFunction) -> Self {
         self.statement = self.statement.projection(Projection::Aggregate(aggregate));
@@ -236,10 +296,14 @@ impl<T: FromBatch> Select<T> {
         )
     }
 
-    /// Executes the query with a `COUNT` aggregate and returns the count.
+    /// Executes the query with a `COUNT(*)` aggregate and returns the count.
     pub async fn count<D: Database>(self, database: &D) -> Result<u64, Error> {
-        let (count,) = self.project::<(u64,)>()
+        let (count,) = self
+            .project::<(u64,)>()
             .count_all()
+            .clear_order_by()
+            .clear_limit()
+            .clear_offset()
             .one(database)
             .await?
             .ok_or_else(|| Error::unexpected("Count query returned no rows"))?;

@@ -30,6 +30,16 @@ pub struct Delete<M: Model, S = Unfiltered> {
     _marker: std::marker::PhantomData<(M, S)>,
 }
 
+impl<M: Model, S> Delete<M, S> {
+    /// Clears the WHERE clause, returning an unfiltered [`Delete`].
+    pub fn clear_where(self) -> Delete<M, Unfiltered> {
+        Delete {
+            statement: self.statement.clear_where(),
+            _marker: std::marker::PhantomData,
+        }
+    }
+}
+
 impl<M: Model> Delete<M, Unfiltered> {
     /// Creates a new unfiltered [`Delete`].
     pub fn new() -> Self {

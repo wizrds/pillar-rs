@@ -8,7 +8,7 @@ Add the git repo to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-pillar = { git = "https://github.com/wizrds/pillar-rs", tag = "0.3.0", features = ["uuid", "chrono", "duckdb-bundled"] }
+pillar = { git = "https://github.com/wizrds/pillar-rs", tag = "0.3.1", features = ["uuid", "chrono", "duckdb-bundled"] }
 ```
 
 Available features:

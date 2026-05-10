@@ -155,6 +155,18 @@ impl InsertStatement {
         self.returning = Some(projections.into_iter().collect());
         self
     }
+
+    /// Clears the column list.
+    pub fn clear_columns(mut self) -> Self {
+        self.columns.clear();
+        self
+    }
+
+    /// Clears the `RETURNING` clause.
+    pub fn clear_returning(mut self) -> Self {
+        self.returning = None;
+        self
+    }
 }
 
 /// AST node for an `UPDATE` statement.
@@ -197,6 +209,24 @@ impl UpdateStatement {
         self.returning = Some(projections.into_iter().collect());
         self
     }
+
+    /// Clears the column/value assignments.
+    pub fn clear_set(mut self) -> Self {
+        self.set.clear();
+        self
+    }
+
+    /// Clears the WHERE clause.
+    pub fn clear_where(mut self) -> Self {
+        self.where_clause = None;
+        self
+    }
+
+    /// Clears the `RETURNING` clause.
+    pub fn clear_returning(mut self) -> Self {
+        self.returning = None;
+        self
+    }
 }
 
 /// AST node for a `DELETE` statement.
@@ -225,6 +255,18 @@ impl DeleteStatement {
         projections: impl IntoIterator<Item = Projection>,
     ) -> Self {
         self.returning = Some(projections.into_iter().collect());
+        self
+    }
+
+    /// Clears the WHERE clause.
+    pub fn clear_where(mut self) -> Self {
+        self.where_clause = None;
+        self
+    }
+
+    /// Clears the `RETURNING` clause.
+    pub fn clear_returning(mut self) -> Self {
+        self.returning = None;
         self
     }
 }

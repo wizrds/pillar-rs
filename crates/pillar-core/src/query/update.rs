@@ -58,6 +58,18 @@ impl<M: Model> Update<M> {
         if condition { f(self) } else { self }
     }
 
+    /// Clears all column/value assignments.
+    pub fn clear_set(mut self) -> Self {
+        self.statement = self.statement.clear_set();
+        self
+    }
+
+    /// Clears the WHERE clause.
+    pub fn clear_where(mut self) -> Self {
+        self.statement = self.statement.clear_where();
+        self
+    }
+
     /// Converts this builder into a [`Statement`].
     pub fn into_statement(self) -> Statement {
         Statement::Update(self.statement)
