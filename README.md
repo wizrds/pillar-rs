@@ -86,7 +86,7 @@ Valid `unit` values: `"second"`, `"minute"`, `"hour"`, `"day"`, `"week"`, `"mont
 
 #### Schema provisioning
 
-When DDL attributes (`engine`, `partition_by`, `ttl`, `order_by`, or `options`) are present, the macro generates an impl of `TableSchema` for the model, which provides `create_statement()`. Without DDL attributes a blanket impl produces a plain `CREATE TABLE` from the column definitions.
+When DDL attributes (`engine`, `partition_by`, `ttl`, `order_by`, or `options`) are present, the macro generates an impl of `ModelSchema` for the model, which provides `create_statement()`. Without DDL attributes a blanket impl produces a plain `CREATE TABLE` from the column definitions.
 
 ```rust
 database.execute(&events::Model::create_statement()).await?;
@@ -176,12 +176,11 @@ database.upgrade::<MyMigrations>().await?;
 database.downgrade_to::<MyMigrations>("001_create_events").await?;
 ```
 
-Alternatively, models with DDL attributes can produce their own `create_statement()` via `TableSchema`, which can be used directly inside a migration:
+Models with DDL attributes can also produce their own `create_statement()` via `ModelSchema`, which can be used directly inside a migration:
 
 ```rust
 async fn up(&self, op: &MigrateOp<'_>) -> Result<(), Error> {
     op.execute(&events::Model::create_statement()).await?;
-
     Ok(())
 }
 ```
@@ -203,6 +202,8 @@ events::Model::insert_batch(vec![
 ```
 
 ### Querying
+
+`Select<T>` is the query builder. It tracks the output type as a generic parameter, so the compiler knows what type `.all()` and `.one()` will return.
 
 ```rust
 // All rows
@@ -230,12 +231,61 @@ while let Some(rows) = stream.try_next().await? {
 }
 ```
 
+#### Projection
+
+`project::<U>()` changes the output type of a query to any type implementing `FromBatch`. It clears the projection list so the caller can specify the exact columns for the new type. All filters, joins, and other clauses are preserved.
+
+```rust
+// Project into a custom struct
+#[derive(Debug, serde::Deserialize, FromBatch)]
+struct EventSummary {
+    pub name: String,
+    pub severity: i32,
+}
+
+let summaries = events::Model::find()
+    .filter_expr(events::Column::severity().gte(3i32))
+    .project::<EventSummary>()
+    .columns(["name", "severity"])
+    .all(&database)
+    .await?;
+
+// Project into a tuple for lightweight reads
+let pairs: Vec<(String, i32)> = events::Model::find()
+    .filter_expr(events::Column::severity().gte(3i32))
+    .project::<(String, i32)>()
+    .columns(["name", "severity"])
+    .all(&database)
+    .await?;
+
+// Count matching rows
+let (n,): (u64,) = events::Model::find()
+    .filter_expr(events::Column::severity().gte(3i32))
+    .project::<(u64,)>()
+    .count_all()
+    .one(&database)
+    .await?
+    .expect("count returned no rows");
+```
+
 ### Updating
 
 ```rust
 events::Model::update()
     .set("severity", 4i32)
     .filter_expr(events::Column::name().eq("failed_login"))
+    .execute(&database)
+    .await?;
+```
+
+Use `filter_if` to conditionally apply a filter:
+
+```rust
+events::Model::update()
+    .set("severity", 4i32)
+    .filter_if(only_recent, |u| {
+        u.filter_expr(events::Column::occurred_at().gte(cutoff))
+    })
     .execute(&database)
     .await?;
 ```
@@ -252,6 +302,35 @@ events::Model::delete()
 // Delete all rows
 events::Model::delete_all().execute(&database).await?;
 ```
+
+### Conversion traits
+
+Pillar exposes three traits that underpin query deserialization and insert serialization.
+
+**`FromBatch`** deserializes an Arrow `RecordBatch` into `Vec<Self>`. It is implemented automatically for all models and views. You can derive it for any plain struct that also derives `serde::Deserialize`:
+
+```rust
+#[derive(Debug, serde::Deserialize, FromBatch)]
+struct EventSummary {
+    pub name: String,
+    pub severity: i32,
+}
+```
+
+Tuples up to arity 8 implement `FromBatch` automatically via column-index mapping: column 0 maps to the first element, column 1 to the second, and so on. No derive is needed.
+
+**`ToRow`** serializes a value into an ordered `Vec<Value>` matching the model's column list. It is implemented automatically for all models. You can derive it for any plain struct whose fields map directly to `Value`:
+
+```rust
+#[derive(Debug, serde::Serialize, ToRow)]
+struct RawTag {
+    pub event_id: uuid::Uuid,
+    pub key: String,
+    pub value: String,
+}
+```
+
+**`FromArrow`** extracts a single typed value from an Arrow array at a given row index. It is implemented for all primitive scalar types and is used internally by the tuple `FromBatch` impls.
 
 ### Advanced queries
 
@@ -400,7 +479,11 @@ Valid `aggregate` values: `"count"`, `"sum"`, `"avg"`, `"min"`, `"max"`.
 
 #### Schema provisioning
 
-`ViewSchema::create_statement()` is available when any DDL attribute (`materialized`, `engine`, `partition_by`, `to`, or `options`) is set, or when `ViewSchema` is implemented manually.
+`ViewSchema::create_statement()` is available when any DDL attribute (`materialized`, `engine`, `partition_by`, `to`, or `options`) is set. For views that need `ViewSchema` but have no DDL attributes, implement it manually:
+
+```rust
+impl ViewSchema for my_view::View {}
+```
 
 ```rust
 database.execute(&events_by_minute::View::create_statement()).await?;
