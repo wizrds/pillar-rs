@@ -8,10 +8,10 @@ license.workspace = true
 readme.workspace = true
 
 [dependencies]
-pillar-macros = { path = "../pillar-macros", version = "0.3.4" }
-pillar-core = { path = "../pillar-core", version = "0.3.4", default-features = false }
-pillar-duckdb = { path = "../pillar-duckdb", version = "0.3.4", default-features = false, optional = true }
-pillar-clickhouse = { path = "../pillar-clickhouse", version = "0.3.4", default-features = false, optional = true }
+pillar-macros = { path = "../pillar-macros", version = "0.3.5" }
+pillar-core = { path = "../pillar-core", version = "0.3.5", default-features = false }
+pillar-duckdb = { path = "../pillar-duckdb", version = "0.3.5", default-features = false, optional = true }
+pillar-clickhouse = { path = "../pillar-clickhouse", version = "0.3.5", default-features = false, optional = true }
 
 async-trait = { workspace = true }
 serde = { workspace = true }

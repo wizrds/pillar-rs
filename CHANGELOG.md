@@ -1,6 +1,12 @@
 # Changelog
 
 ---
+## [0.3.5](https://github.com/wizrds/pillar-rs/-/compare/0.3.4...0.3.5) - 2026-05-10
+
+### Bug Fixes
+
+- **(clickhouse)** Ensure time bucket is cast to datetime type - ([7c8b787](https://github.com/wizrds/pillar-rs/-/commit/7c8b787072a4e47ba20e15bf6b4aa37d53d73f72)) - Timothy Pogue
+---
 ## [0.3.4](https://github.com/wizrds/pillar-rs/-/compare/0.3.3...0.3.4) - 2026-05-10
 
 ### Bug Fixes
