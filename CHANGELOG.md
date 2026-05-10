@@ -1,6 +1,12 @@
 # Changelog
 
 ---
+## [0.3.2](https://github.com/wizrds/pillar-rs/-/compare/0.3.1...0.3.2) - 2026-05-10
+
+### Bug Fixes
+
+- **(core)** Fix derives in select builder - ([299d3b0](https://github.com/wizrds/pillar-rs/-/commit/299d3b0f928d9a08baf78f7b6cc23068382c2c55)) - Timothy Pogue
+---
 ## [0.3.1](https://github.com/wizrds/pillar-rs/-/compare/0.3.0...0.3.1) - 2026-05-10
 
 ### Bug Fixes
