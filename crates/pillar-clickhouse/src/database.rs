@@ -137,10 +137,7 @@ impl Database for ClickHouseDatabase {
             .map_err(|e| Error::connection(e.to_string()))?;
 
         let batches = Self::decode_stream(cursor)
-            .map(|r| r.and_then(|b| {
-                println!("raw schema: {:?} and batch: {:?}", b.schema(), b);
-                self.normalizer.normalize(b)
-            }))
+            .map(|r| r.and_then(|b| self.normalizer.normalize(b)))
             .collect::<Vec<_>>()
             .await
             .into_iter()
