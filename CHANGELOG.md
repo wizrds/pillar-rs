@@ -1,6 +1,12 @@
 # Changelog
 
 ---
+## [0.3.7](https://github.com/wizrds/pillar-rs/-/compare/0.3.6...0.3.7) - 2026-05-10
+
+### Bug Fixes
+
+- **(clickhouse)** Remove left over debugging line - ([7f59c06](https://github.com/wizrds/pillar-rs/-/commit/7f59c06f8925dec186d810e8956b654bc4782d29)) - Timothy Pogue
+---
 ## [0.3.6](https://github.com/wizrds/pillar-rs/-/compare/0.3.5...0.3.6) - 2026-05-10
 
 ### Bug Fixes
