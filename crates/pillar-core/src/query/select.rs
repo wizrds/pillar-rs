@@ -27,6 +27,7 @@ use crate::{
 ///
 /// `T` can be any type implementing [`FromBatch`]: a model, a view, a plain
 /// struct with `#[derive(FromBatch)]`, or a tuple like `(i64, String)`.
+#[derive(Debug, Clone)]
 pub struct Select<T: FromBatch> {
     statement: SelectStatement,
     _marker: PhantomData<T>,
@@ -326,14 +327,5 @@ impl<T: FromBatch> Select<T> {
                         .map_err(Error::from)
                 })
         )
-    }
-}
-
-impl<T: FromBatch> Clone for Select<T> {
-    fn clone(&self) -> Self {
-        Self {
-            statement: self.statement.clone(),
-            _marker: PhantomData,
-        }
     }
 }
