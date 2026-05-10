@@ -1,6 +1,12 @@
 # Changelog
 
 ---
+## [0.3.4](https://github.com/wizrds/pillar-rs/-/compare/0.3.3...0.3.4) - 2026-05-10
+
+### Bug Fixes
+
+- **(core)** Expose projection method on typed Select builder - ([f078426](https://github.com/wizrds/pillar-rs/-/commit/f07842617af584fa0a684b9fb73d70093f84cd03)) - Timothy Pogue
+---
 ## [0.3.3](https://github.com/wizrds/pillar-rs/-/compare/0.3.2...0.3.3) - 2026-05-10
 
 ### Bug Fixes
