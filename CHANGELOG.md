@@ -1,6 +1,16 @@
 # Changelog
 
 ---
+## [0.3.0](https://github.com/wizrds/pillar-rs/-/compare/0.2.2...0.3.0) - 2026-05-10
+
+### Bug Fixes
+
+- Derive clone on query builders - ([e796057](https://github.com/wizrds/pillar-rs/-/commit/e79605717405b8d136708bb5fd912532b9bd068c)) - Timothy Pogue
+
+### Features
+
+- **(core)** introduce typed Select<T>, FromBatch/ToRow traits, and project() API - ([5d479d3](https://github.com/wizrds/pillar-rs/-/commit/5d479d3c50bba10283c60cc2bfc1ca46a2fa23e6)) - Timothy Pogue
+---
 ## [0.2.2](https://github.com/wizrds/pillar-rs/-/compare/0.2.1...0.2.2) - 2026-05-09
 
 ### Bug Fixes
