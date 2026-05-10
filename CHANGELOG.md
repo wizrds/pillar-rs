@@ -1,6 +1,16 @@
 # Changelog
 
 ---
+## [0.3.1](https://github.com/wizrds/pillar-rs/-/compare/0.3.0...0.3.1) - 2026-05-10
+
+### Bug Fixes
+
+- **(core)** Add clear methods to statement ast and ensure limit, order by, and offset removed from count in Select builder - ([ee47197](https://github.com/wizrds/pillar-rs/-/commit/ee47197c66ebaa197fa60d0a3daf63177cb5bf3f)) - Timothy Pogue
+
+### Miscellaneous
+
+- Update README - ([ba74b39](https://github.com/wizrds/pillar-rs/-/commit/ba74b39e41673c72a62ba361bd54f015308fb05a)) - Timothy Pogue
+---
 ## [0.3.0](https://github.com/wizrds/pillar-rs/-/compare/0.2.2...0.3.0) - 2026-05-10
 
 ### Bug Fixes
