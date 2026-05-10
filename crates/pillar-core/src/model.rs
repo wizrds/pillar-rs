@@ -1,6 +1,11 @@
 use arrow::record_batch::RecordBatch;
 
-use crate::{column::ColumnDef, errors::Error, value::Value};
+use crate::{
+    ast::{Statement, CreateTableStatement, ColumnDefinition},
+    column::ColumnDef,
+    errors::Error,
+    value::Value
+};
 
 
 /// Describes a table-backed data type that can be queried and mutated through pillar.
@@ -36,5 +41,21 @@ pub trait Model: Sized + Send + Sync {
         Self::columns()
             .iter()
             .find(|col| col.name == name)
+    }
+}
+
+/// A [`Model`] that can produce the DDL statement needed to create its backing table.
+pub trait ModelSchema: Model {
+    /// Returns a [`Statement`] that creates the backing table for this model.
+    fn create_statement() -> Statement {
+        Statement::CreateTable(
+            CreateTableStatement::new(Self::table_name())
+                .if_not_exists()
+                .columns(
+                    Self::columns()
+                        .iter()
+                        .map(ColumnDefinition::from),
+                ),
+        )
     }
 }

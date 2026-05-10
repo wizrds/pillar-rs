@@ -8,6 +8,7 @@ pub use pillar_core::{
     ast::*,
     column::*,
     condition::*,
+    convert::*,
     database::*,
     dialect::*,
     errors::*,

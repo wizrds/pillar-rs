@@ -6,6 +6,8 @@ use syn::DeriveInput;
 
 use crate::attr::{FieldAttrs, ModelAttrs, TtlAttr, TtlUnit};
 use crate::column::{column_info, column_struct, columns_body};
+use crate::from_batch;
+use crate::to_row;
 
 
 pub fn derive(input: DeriveInput) -> TokenStream {
@@ -43,16 +45,18 @@ fn model_struct(table_name: &str, fields: &[FieldAttrs]) -> syn::Result<TokenStr
 
     let columns_body = columns_body(fields)?;
 
-    let row_fields = fields.iter().filter(|f| !f.skip).map(|f| {
-        let ident = f.ident.as_ref().unwrap();
-        quote! { ::pillar::value::Value::from(self.#ident.clone()) }
-    });
+    let model_ident = syn::Ident::new("Model", proc_macro2::Span::call_site());
+    let from_batch_impl = from_batch::derive_for(&model_ident);
+    let to_row_impl = to_row::impl_to_row_for(&model_ident, fields);
 
     Ok(quote! {
         #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
         pub struct Model {
             #(#struct_fields),*
         }
+
+        #from_batch_impl
+        #to_row_impl
 
         impl ::pillar::model::Model for Model {
             fn table_name() -> &'static str {
@@ -63,15 +67,14 @@ fn model_struct(table_name: &str, fields: &[FieldAttrs]) -> syn::Result<TokenStr
                 #columns_body
             }
 
-            fn to_row(&self) -> ::std::vec::Vec<::pillar::value::Value> {
-                vec![#(#row_fields),*]
-            }
-
             fn from_record_batch(
                 batch: ::pillar::__private::arrow::record_batch::RecordBatch,
             ) -> ::std::result::Result<::std::vec::Vec<Self>, ::pillar::errors::Error> {
-                ::pillar::__private::serde_arrow::from_record_batch(&batch)
-                    .map_err(|e| ::pillar::errors::Error::serialization(e.to_string()))
+                <Self as ::pillar::convert::FromBatch>::from_batch(batch)
+            }
+
+            fn to_row(&self) -> ::std::vec::Vec<::pillar::value::Value> {
+                <Self as ::pillar::convert::ToRow>::to_row(self)
             }
 
             fn to_record_batch(
@@ -170,7 +173,7 @@ fn table_schema_impl(table_name: &str, fields: &[FieldAttrs], attrs: &ModelAttrs
     };
 
     Ok(quote! {
-        impl ::pillar::query::TableSchema for Model {
+        impl ::pillar::model::ModelSchema for Model {
             fn create_statement() -> ::pillar::ast::Statement {
                 ::pillar::ast::Statement::CreateTable(
                     ::pillar::ast::CreateTableStatement::new(#table_name)

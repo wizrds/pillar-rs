@@ -4,6 +4,8 @@ extern crate self as pillar_macros;
 mod attr;
 mod column;
 mod condition;
+mod from_batch;
+mod to_row;
 mod model;
 mod view;
 
@@ -23,4 +25,18 @@ pub fn derive_model(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(View, attributes(pillar))]
 pub fn derive_view(input: TokenStream) -> TokenStream {
     view::derive(parse_macro_input!(input as DeriveInput)).into()
+}
+
+/// Derives [`pillar::convert::FromBatch`](pillar_core::convert::FromBatch) for a struct.
+/// The struct must also implement `serde::Deserialize`.
+#[proc_macro_derive(FromBatch)]
+pub fn derive_from_batch(input: TokenStream) -> TokenStream {
+    from_batch::derive(parse_macro_input!(input as DeriveInput)).into()
+}
+
+/// Derives [`pillar::convert::ToRow`](pillar_core::convert::ToRow) for a struct,
+/// serializing each field to a `Value` in declaration order.
+#[proc_macro_derive(ToRow, attributes(pillar))]
+pub fn derive_to_row(input: TokenStream) -> TokenStream {
+    to_row::derive(parse_macro_input!(input as DeriveInput)).into()
 }

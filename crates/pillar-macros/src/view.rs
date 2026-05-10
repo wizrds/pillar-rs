@@ -7,6 +7,7 @@ use syn::DeriveInput;
 use crate::attr::{AggregateOp, FieldAttrs, ViewAttrs};
 use crate::column::{column_struct, columns_body};
 use crate::condition::parse_condition;
+use crate::from_batch;
 
 
 pub fn derive(input: DeriveInput) -> TokenStream {
@@ -45,11 +46,16 @@ fn view_struct(view_name: &str, fields: &[FieldAttrs], attrs: &ViewAttrs) -> syn
     let columns_body = columns_body(fields)?;
     let view_query_impl = view_query_impl(fields, attrs)?;
 
+    let view_ident = syn::Ident::new("View", proc_macro2::Span::call_site());
+    let from_batch_impl = from_batch::derive_for(&view_ident);
+
     Ok(quote! {
         #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
         pub struct View {
             #(#struct_fields),*
         }
+
+        #from_batch_impl
 
         impl ::pillar::view::View for View {
             fn view_name() -> &'static str {
@@ -63,8 +69,7 @@ fn view_struct(view_name: &str, fields: &[FieldAttrs], attrs: &ViewAttrs) -> syn
             fn from_record_batch(
                 batch: ::pillar::__private::arrow::record_batch::RecordBatch,
             ) -> ::std::result::Result<::std::vec::Vec<Self>, ::pillar::errors::Error> {
-                ::pillar::__private::serde_arrow::from_record_batch(&batch)
-                    .map_err(|e| ::pillar::errors::Error::serialization(e.to_string()))
+                <Self as ::pillar::convert::FromBatch>::from_batch(batch)
             }
         }
 
@@ -232,7 +237,7 @@ fn view_schema_impl(fields: &[FieldAttrs], attrs: &ViewAttrs) -> syn::Result<Tok
     };
 
     Ok(quote! {
-        impl ::pillar::query::ViewSchema for View {
+        impl ::pillar::view::ViewSchema for View {
             fn create_statement() -> ::pillar::ast::Statement {
                 #create_stmt
             }
