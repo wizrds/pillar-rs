@@ -3,7 +3,7 @@ pub mod expression;
 pub mod mutation;
 pub mod schema;
 pub mod select;
-pub mod ttl;
+pub mod duration;
 pub mod window;
 pub mod compound;
 
@@ -12,7 +12,7 @@ pub use expression::*;
 pub use mutation::*;
 pub use schema::*;
 pub use select::*;
-pub use ttl::*;
+pub use duration::*;
 pub use window::*;
 pub use compound::*;
 

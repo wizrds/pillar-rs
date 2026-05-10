@@ -8,7 +8,7 @@ Add the git repo to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-pillar = { git = "https://github.com/wizrds/pillar-rs", tag = "0.3.2", features = ["uuid", "chrono", "duckdb-bundled"] }
+pillar = { git = "https://github.com/wizrds/pillar-rs", tag = "0.3.3", features = ["uuid", "chrono", "duckdb-bundled"] }
 ```
 
 Available features:
@@ -391,6 +391,18 @@ let stmt = Statement::insert(
         .columns(["name", "severity"])
         .values([[Value::string("login"), Value::Int32(1)]])
         .returning([Projection::column("id")])
+);
+
+// Time-bucketing renders to the correct backend function automatically
+let stmt = Statement::select(
+    SelectStatement::new("events")
+        .projections([
+            Projection::expr(
+                Expression::time_bucket(Interval::minutes(5), "occurred_at")
+            ).alias("bucket"),
+            Projection::aggregate(AggregateFunction::count_all()).alias("count"),
+        ])
+        .group_by(["bucket"])
 );
 ```
 

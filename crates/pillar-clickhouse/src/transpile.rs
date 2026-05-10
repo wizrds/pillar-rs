@@ -528,6 +528,19 @@ impl Transpiler {
             Expression::Subquery(query) => {
                 self.select(query, inline).unwrap_or_else(|_| "NULL".to_string())
             }
+
+            Expression::Interval(i) => format!(
+                "INTERVAL {} {}",
+                i.value,
+                self.interval_unit(&i.unit),
+            ),
+
+            Expression::TimeBucket { interval, column } => format!(
+                "toStartOfInterval({}, INTERVAL {} {})",
+                column.name,
+                interval.value,
+                self.interval_unit(&interval.unit),
+            ),
         }
     }
 
@@ -785,8 +798,8 @@ mod tests {
         ast::{
             AggregateFunction, AlterTableStatement, ColumnDefinition,
             CreateMaterializedViewStatement, CreateTableStatement, CreateViewStatement,
-            DeleteStatement, DropTableStatement, DropViewStatement, InsertStatement, Interval,
-            Projection, SelectStatement, Statement, TtlClause,
+            DeleteStatement, DropTableStatement, DropViewStatement, Expression,
+            InsertStatement, Interval, Projection, SelectStatement, Statement, TtlClause,
             UpdateStatement, AggregateFn, ColumnType,
         },
         condition::ConditionExpression,
@@ -1124,5 +1137,31 @@ mod tests {
         let (sql, params) = transpile(Statement::raw("SELECT 1", [Value::Int32(1)]));
         assert_eq!(sql, "SELECT 1");
         assert_eq!(params, vec![Value::Int32(1)]);
+    }
+
+    #[test]
+    fn test_interval_expression() {
+        let (sql, _) = transpile(Statement::select(
+            SelectStatement::new("events")
+                .projections([Projection::expr(Expression::interval(Interval::minutes(5)))]),
+        ));
+        assert_eq!(sql, "SELECT INTERVAL 5 MINUTE FROM events");
+    }
+
+    #[test]
+    fn test_time_bucket() {
+        let (sql, _) = transpile(Statement::select(
+            SelectStatement::new("crawl_log_metrics")
+                .projections([
+                    Projection::expr(
+                        Expression::time_bucket(Interval::minutes(5), "bucket")
+                    ).alias("bucket"),
+                ])
+                .group_by(["bucket"]),
+        ));
+        assert_eq!(
+            sql,
+            "SELECT toStartOfInterval(bucket, INTERVAL 5 MINUTE) AS bucket FROM crawl_log_metrics GROUP BY bucket"
+        );
     }
 }

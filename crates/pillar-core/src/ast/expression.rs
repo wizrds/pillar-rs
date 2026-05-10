@@ -1,6 +1,7 @@
 use crate::{
     value::Value,
     ast::{
+        duration::Interval,
         refs::ColumnRef,
         schema::ColumnType,
         window::WindowFunction,
@@ -173,6 +174,13 @@ pub enum Expression {
     Window(Box<WindowFunction>),
     /// A scalar subquery returning a single value.
     Subquery(Box<SelectStatement>),
+    /// An interval literal.
+    Interval(Interval),
+    /// A time-bucketing expression that truncates a timestamp column to a fixed interval width.
+    TimeBucket {
+        interval: Interval,
+        column: ColumnRef,
+    },
 }
 
 impl Expression {
@@ -220,6 +228,16 @@ impl Expression {
     /// Wraps a scalar subquery as an expression.
     pub fn subquery(stmt: SelectStatement) -> Self {
         Self::Subquery(Box::new(stmt))
+    }
+
+    /// An interval literal.
+    pub fn interval(interval: Interval) -> Self {
+        Self::Interval(interval)
+    }
+
+    /// A time-bucketing expression that truncates a timestamp column to a fixed interval width.
+    pub fn time_bucket(interval: Interval, column: impl Into<ColumnRef>) -> Self {
+        Self::TimeBucket { interval, column: column.into() }
     }
 
     /// Adds this expression to `rhs` (`+`).

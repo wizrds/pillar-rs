@@ -3,9 +3,9 @@ use pillar_core::{
         AggregateFunction, AlterTableStatement, BinaryOperator, ColumnDefinition, ColumnType,
         CompoundSelect, CountArg, Cte, CreateMaterializedViewStatement, CreateTableStatement,
         CreateViewStatement, DeleteStatement, DropTableStatement, DropViewStatement, Expression,
-        FrameBound, FrameUnit, FromSource, InsertBody, InsertStatement, JoinType, NullsOrder,
-        OnConflictAction, OrderDirection, Projection, SelectStatement, SetOperator, Statement,
-        UpdateStatement, AggregateFn, WindowFunc, WindowFunction, WindowSpec,
+        FrameBound, FrameUnit, FromSource, InsertBody, InsertStatement, IntervalUnit, JoinType,
+        NullsOrder, OnConflictAction, OrderDirection, Projection, SelectStatement, SetOperator,
+        Statement, UpdateStatement, AggregateFn, WindowFunc, WindowFunction, WindowSpec,
     },
     condition::{ComparisonOp, ConditionExpression},
     errors::Error,
@@ -521,6 +521,31 @@ impl Transpiler {
             Expression::Subquery(query) => {
                 self.select(query, inline).unwrap_or_else(|_| "NULL".to_string())
             }
+
+            Expression::Interval(i) => format!(
+                "INTERVAL '{} {}'",
+                i.value,
+                self.interval_unit(&i.unit),
+            ),
+
+            Expression::TimeBucket { interval, column } => format!(
+                "time_bucket(INTERVAL '{} {}', {})",
+                interval.value,
+                self.interval_unit(&interval.unit),
+                column.name,
+            ),
+        }
+    }
+
+    fn interval_unit(&self, unit: &IntervalUnit) -> &'static str {
+        match unit {
+            IntervalUnit::Second => "seconds",
+            IntervalUnit::Minute => "minutes",
+            IntervalUnit::Hour => "hours",
+            IntervalUnit::Day => "days",
+            IntervalUnit::Week => "weeks",
+            IntervalUnit::Month => "months",
+            IntervalUnit::Year => "years",
         }
     }
 
@@ -814,9 +839,9 @@ mod tests {
     use pillar_core::{
         ast::{
             AggregateFunction, AlterTableStatement, ColumnDefinition,
-            CreateTableStatement, DeleteStatement, InsertStatement, Interval,
-            Projection, SelectStatement, Statement, TtlClause, UpdateStatement,
-            AggregateFn, ColumnType,
+            CreateTableStatement, DeleteStatement, Expression, InsertStatement,
+            Interval, Projection, SelectStatement, Statement, TtlClause,
+            UpdateStatement, AggregateFn, ColumnType,
         },
         condition::ConditionExpression,
         value::Value,
@@ -1089,6 +1114,32 @@ mod tests {
             "SELECT ANY_VALUE(latency_sum) AS latency_sum FROM crawl_log_latency",
         );
         assert!(params.is_empty());
+    }
+
+    #[test]
+    fn test_interval_expression() {
+        let (sql, _) = transpile(Statement::select(
+            SelectStatement::new("events")
+                .projections([Projection::expr(Expression::interval(Interval::minutes(5)))]),
+        ));
+        assert_eq!(sql, "SELECT INTERVAL '5 minutes' FROM events");
+    }
+
+    #[test]
+    fn test_time_bucket() {
+        let (sql, _) = transpile(Statement::select(
+            SelectStatement::new("crawl_log_metrics")
+                .projections([
+                    Projection::expr(
+                        Expression::time_bucket(Interval::minutes(5), "bucket")
+                    ).alias("bucket"),
+                ])
+                .group_by(["bucket"]),
+        ));
+        assert_eq!(
+            sql,
+            "SELECT time_bucket(INTERVAL '5 minutes', bucket) AS bucket FROM crawl_log_metrics GROUP BY bucket"
+        );
     }
 
     #[test]

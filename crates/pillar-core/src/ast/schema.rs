@@ -12,7 +12,7 @@ use crate::{
     ast::{
         refs::{ColumnRef, TableRef},
         select::SelectStatement,
-        ttl::TtlClause,
+        duration::TtlClause,
     },
 };
 
