@@ -1,11 +1,10 @@
 use pillar_core::{
     ast::Statement,
-    errors::Error,
     dialect::{Dialect, Feature, PreparedStatement},
+    errors::Error,
 };
 
 use crate::transpile::Transpiler;
-
 
 /// A [`pillar_core::dialect::Dialect`](pillar_core::dialect::Dialect) implementation for DuckDB.
 pub struct DuckDbDialect;

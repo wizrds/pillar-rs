@@ -1,8 +1,7 @@
 use crate::{
-    ast::{refs::ColumnRef, expression::Expression, select::SelectStatement},
+    ast::{expression::Expression, refs::ColumnRef, select::SelectStatement},
     value::Value,
 };
-
 
 /// A comparison operator used in a [`Compare`](crate::condition::ConditionExpression::Compare) condition.
 #[derive(Debug, Clone, PartialEq)]
@@ -132,12 +131,20 @@ impl ConditionExpression {
     }
 
     /// Creates a `BETWEEN` condition.
-    pub fn between(column: impl Into<ColumnRef>, low: impl Into<Value>, high: impl Into<Value>) -> Self {
+    pub fn between(
+        column: impl Into<ColumnRef>,
+        low: impl Into<Value>,
+        high: impl Into<Value>,
+    ) -> Self {
         ConditionExpression::Between(column.into(), low.into(), high.into())
     }
 
     /// Creates a `NOT BETWEEN` condition.
-    pub fn not_between(column: impl Into<ColumnRef>, low: impl Into<Value>, high: impl Into<Value>) -> Self {
+    pub fn not_between(
+        column: impl Into<ColumnRef>,
+        low: impl Into<Value>,
+        high: impl Into<Value>,
+    ) -> Self {
         ConditionExpression::NotBetween(column.into(), low.into(), high.into())
     }
 
@@ -220,11 +227,7 @@ impl Condition {
     where
         F: FnOnce(Self) -> Self,
     {
-        if condition {
-            f(self)
-        } else {
-            self
-        }
+        if condition { f(self) } else { self }
     }
 
     /// Appends an expression if `Some`, otherwise returns unchanged.
@@ -248,8 +251,7 @@ impl Condition {
     /// Returns `true` if this condition contains no expressions.
     pub fn is_empty(&self) -> bool {
         match self {
-            Condition::All(exprs)
-            | Condition::Any(exprs) => exprs.is_empty(),
+            Condition::All(exprs) | Condition::Any(exprs) => exprs.is_empty(),
         }
     }
 
@@ -262,7 +264,7 @@ impl Condition {
                 let mut iter = exprs.iter();
                 let first = iter.next().unwrap().clone();
                 Some(iter.fold(first, |acc, expr| acc.and(expr.clone())))
-            },
+            }
             Condition::Any(exprs) if exprs.is_empty() => None,
             Condition::Any(exprs) if exprs.len() == 1 => Some(exprs[0].clone()),
             Condition::Any(exprs) => {

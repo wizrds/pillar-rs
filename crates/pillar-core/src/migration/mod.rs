@@ -1,27 +1,19 @@
 pub mod graph;
 pub mod traits;
 
-pub use graph::{RevisionGraph, RevisionChain};
-pub use traits::{
-    MigrateOp,
-    Migration,
-    MigrationDirection,
-    MigrationRef,
-    Migrations,
-    Migrator,
-};
+pub use graph::{RevisionChain, RevisionGraph};
+pub use traits::{MigrateOp, Migration, MigrationDirection, MigrationRef, Migrations, Migrator};
 
-use async_trait::async_trait;
 use crate::{
     ast::{
-        ColumnDefinition, ColumnType, CreateTableStatement, InsertStatement,
-        OnConflict, OnConflictAction, Projection, SelectStatement, Statement,
+        ColumnDefinition, ColumnType, CreateTableStatement, InsertStatement, OnConflict,
+        OnConflictAction, Projection, SelectStatement, Statement,
     },
     database::{AsDynDatabase, Database},
     errors::Error,
     value::Value,
 };
-
+use async_trait::async_trait;
 
 /// Runs migrations for a given [`Migrations`](crate::migration::Migrations) collection against a database.
 pub struct MigrationRunner<M: Migrations> {
@@ -45,29 +37,27 @@ impl<M: Migrations> MigrationRunner<M> {
 
         let count = result
             .get_as::<u64>(0, 0)
-            .unwrap_or_else(|| {
-                result
-                    .get_as::<i64>(0, 0)
-                    .unwrap_or(0) as u64
-            });
+            .unwrap_or_else(|| result.get_as::<i64>(0, 0).unwrap_or(0) as u64);
 
         if count == 0 {
             return Ok(None);
         }
 
-        Ok(
-            database
-                .query(&Statement::select(
-                    SelectStatement::new("_migrations")
-                        .projections([Projection::column("revision_id")])
-                        .limit(1u64),
-                ))
-                .await?
-                .get_as::<String>(0, 0)
-        )
+        Ok(database
+            .query(&Statement::select(
+                SelectStatement::new("_migrations")
+                    .projections([Projection::column("revision_id")])
+                    .limit(1u64),
+            ))
+            .await?
+            .get_as::<String>(0, 0))
     }
 
-    async fn set_revision_id(&self, database: &dyn Database, revision_id: &str) -> Result<(), Error> {
+    async fn set_revision_id(
+        &self,
+        database: &dyn Database,
+        revision_id: &str,
+    ) -> Result<(), Error> {
         database
             .execute(&Statement::create_table(
                 CreateTableStatement::new("_migrations")
@@ -84,11 +74,12 @@ impl<M: Migrations> MigrationRunner<M> {
                     .columns(["revision_id"])
                     .values([[revision_id]])
                     .on_conflict(
-                        OnConflict::new(OnConflictAction::do_update([
-                            ("revision_id", Value::string(revision_id))
-                        ]))
-                        .target(["revision_id"])
-                    )
+                        OnConflict::new(OnConflictAction::do_update([(
+                            "revision_id",
+                            Value::string(revision_id),
+                        )]))
+                        .target(["revision_id"]),
+                    ),
             ))
             .await?;
 
@@ -119,12 +110,14 @@ impl<M: Migrations> MigrationRunner<M> {
 
     /// Applies migrations up to the given target revision ID.
     pub async fn upgrade_to(&self, database: &dyn Database, target: &str) -> Result<(), Error> {
-        self.apply(database, target, MigrationDirection::Up).await
+        self.apply(database, target, MigrationDirection::Up)
+            .await
     }
 
     /// Reverts migrations down to the given target revision ID.
     pub async fn downgrade_to(&self, database: &dyn Database, target: &str) -> Result<(), Error> {
-        self.apply(database, target, MigrationDirection::Down).await
+        self.apply(database, target, MigrationDirection::Down)
+            .await
     }
 
     async fn apply(
@@ -142,7 +135,8 @@ impl<M: Migrations> MigrationRunner<M> {
                     .as_deref()
                     .unwrap_or_else(|| self.chain.tail().unwrap_or(""));
 
-                let path = self.chain
+                let path = self
+                    .chain
                     .upgrade_path(from, target)
                     .ok_or_else(|| {
                         Error::invalid_query(format!("no upgrade path to '{target}'"))
@@ -153,7 +147,7 @@ impl<M: Migrations> MigrationRunner<M> {
                 } else {
                     path
                 }
-            },
+            }
             MigrationDirection::Down => {
                 let from = current_revision
                     .as_deref()
@@ -164,19 +158,21 @@ impl<M: Migrations> MigrationRunner<M> {
                     .ok_or_else(|| {
                         Error::invalid_query(format!("no downgrade path to '{target}'"))
                     })?
-            },
+            }
         };
 
         for migration in path {
             match direction {
                 MigrationDirection::Up => {
                     migration.up(&op).await?;
-                    self.set_revision_id(database, migration.id()).await?;
+                    self.set_revision_id(database, migration.id())
+                        .await?;
                 }
 
                 MigrationDirection::Down => {
                     migration.down(&op).await?;
-                    self.set_revision_id(database, migration.previous_id().unwrap_or("")).await?;
+                    self.set_revision_id(database, migration.previous_id().unwrap_or(""))
+                        .await?;
                 }
             }
         }

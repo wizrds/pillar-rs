@@ -1,11 +1,10 @@
 use arrow::record_batch::RecordBatch;
 
 use crate::{
-    ast::{Statement, SelectStatement, CreateViewStatement},
+    ast::{CreateViewStatement, SelectStatement, Statement},
     column::ColumnDef,
-    errors::Error
+    errors::Error,
 };
-
 
 /// Describes a view that can be queried through pillar.
 ///
@@ -35,8 +34,7 @@ pub trait ViewSchema: ViewQuery + Sized {
     /// Returns a [`Statement`] that creates this view.
     fn create_statement() -> Statement {
         Statement::CreateView(
-            CreateViewStatement::new(Self::view_name(), Self::query())
-                .if_not_exists(),
+            CreateViewStatement::new(Self::view_name(), Self::query()).if_not_exists(),
         )
     }
 }

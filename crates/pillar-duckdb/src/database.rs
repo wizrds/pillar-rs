@@ -1,17 +1,16 @@
-use std::sync::{Arc, Mutex};
+use arrow::compute::concat_batches;
 use async_trait::async_trait;
 use futures::stream::{self, BoxStream};
-use arrow::compute::concat_batches;
 use pillar_core::{
     ast::Statement,
-    errors::Error,
     database::Database,
     dialect::Dialect,
+    errors::Error,
     types::{ExecutionResult, QueryResult},
 };
+use std::sync::{Arc, Mutex};
 
 use crate::{dialect::DuckDbDialect, normalize::BatchNormalizer, value::DuckDbValue};
-
 
 /// A [`pillar_core::database::Database`](pillar_core::database::Database) implementation backed by DuckDB.
 pub struct DuckDbDatabase {
@@ -62,7 +61,9 @@ impl Database for DuckDbDatabase {
         let conn = Arc::clone(&self.conn);
 
         blocking::unblock(move || {
-            let guard = conn.lock().map_err(|e| Error::connection(e.to_string()))?;
+            let guard = conn
+                .lock()
+                .map_err(|e| Error::connection(e.to_string()))?;
 
             if prepared.params.is_empty() {
                 guard
@@ -73,7 +74,12 @@ impl Database for DuckDbDatabase {
                 guard
                     .execute(
                         &prepared.sql,
-                        duckdb::params_from_iter(prepared.params.iter().map(DuckDbValue::from)),
+                        duckdb::params_from_iter(
+                            prepared
+                                .params
+                                .iter()
+                                .map(DuckDbValue::from),
+                        ),
                     )
                     .map(|rows_affected| ExecutionResult { rows_affected, metadata: None })
                     .map_err(Error::sourced_connection)
@@ -97,7 +103,8 @@ impl Database for DuckDbDatabase {
 
             let arrow = stmt
                 .query_arrow(duckdb::params_from_iter(
-                    prepared.params
+                    prepared
+                        .params
                         .iter()
                         .map(DuckDbValue::from),
                 ))
@@ -129,7 +136,8 @@ impl Database for DuckDbDatabase {
                     .map_err(Error::sourced_connection)?;
 
                 stmt.query_arrow(duckdb::params_from_iter(
-                    prepared.params
+                    prepared
+                        .params
                         .iter()
                         .map(DuckDbValue::from),
                 ))
@@ -138,7 +146,11 @@ impl Database for DuckDbDatabase {
             })
             .await?
             .into_iter()
-            .map(|batch| self.normalizer.normalize(batch).map(QueryResult::from))
+            .map(|batch| {
+                self.normalizer
+                    .normalize(batch)
+                    .map(QueryResult::from)
+            }),
         )))
     }
 }

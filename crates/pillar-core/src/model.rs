@@ -1,12 +1,11 @@
 use arrow::record_batch::RecordBatch;
 
 use crate::{
-    ast::{Statement, CreateTableStatement, ColumnDefinition},
+    ast::{ColumnDefinition, CreateTableStatement, Statement},
     column::ColumnDef,
     errors::Error,
-    value::Value
+    value::Value,
 };
-
 
 /// Describes a table-backed data type that can be queried and mutated through pillar.
 ///

@@ -3,7 +3,6 @@ use chrono::{NaiveDate, Timelike};
 
 use pillar_core::value::Value;
 
-
 pub(crate) struct DuckDbValue(pub(crate) duckdb::types::Value);
 
 impl From<&Value> for DuckDbValue {
@@ -24,7 +23,10 @@ impl From<&Value> for DuckDbValue {
             Value::String(s) => duckdb::types::Value::Text(s.clone()),
             Value::Bytes(b) => duckdb::types::Value::Blob(b.clone()),
             Value::List(items) => duckdb::types::Value::List(
-                items.iter().map(|v| DuckDbValue::from(v).0).collect(),
+                items
+                    .iter()
+                    .map(|v| DuckDbValue::from(v).0)
+                    .collect(),
             ),
             Value::Map(pairs) => duckdb::types::Value::List(
                 pairs

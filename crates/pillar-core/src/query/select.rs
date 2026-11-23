@@ -4,24 +4,14 @@ use futures::stream::{Stream, StreamExt};
 
 use crate::{
     ast::{
-        AggregateFunction,
-        ColumnRef,
-        CountArg,
-        FromSource,
-        Join,
-        JoinType,
-        OrderBy,
-        Projection,
-        SelectStatement,
-        Statement,
-        TableRef,
+        AggregateFunction, ColumnRef, CountArg, FromSource, Join, JoinType, OrderBy, Projection,
+        SelectStatement, Statement, TableRef,
     },
     condition::{Condition, ConditionExpression},
     convert::FromBatch,
     database::Database,
     errors::Error,
 };
-
 
 /// A builder for a `SELECT` query that deserializes results into `T`.
 ///
@@ -66,15 +56,19 @@ impl<T: FromBatch> Select<T> {
         I: IntoIterator<Item = C>,
         C: Into<ColumnRef>,
     {
-        self.statement = self.statement
-            .projections(columns.into_iter().map(Projection::column));
+        self.statement = self.statement.projections(
+            columns
+                .into_iter()
+                .map(Projection::column),
+        );
 
         self
     }
 
     /// Appends a column projection with an alias.
     pub fn column_as<C: Into<ColumnRef>>(mut self, column: C, alias: impl Into<String>) -> Self {
-        self.statement = self.statement
+        self.statement = self
+            .statement
             .projection(Projection::column_alias(column, alias));
 
         self
@@ -148,13 +142,17 @@ impl<T: FromBatch> Select<T> {
 
     /// Appends an ascending `ORDER BY` on the given column.
     pub fn order_by_asc<C: Into<ColumnRef>>(mut self, column: C) -> Self {
-        self.statement = self.statement.order_by(OrderBy::asc(column));
+        self.statement = self
+            .statement
+            .order_by(OrderBy::asc(column));
         self
     }
 
     /// Appends a descending `ORDER BY` on the given column.
     pub fn order_by_desc<C: Into<ColumnRef>>(mut self, column: C) -> Self {
-        self.statement = self.statement.order_by(OrderBy::desc(column));
+        self.statement = self
+            .statement
+            .order_by(OrderBy::desc(column));
         self
     }
 
@@ -244,7 +242,9 @@ impl<T: FromBatch> Select<T> {
 
     /// Appends an aggregate projection.
     pub fn aggregate(mut self, aggregate: AggregateFunction) -> Self {
-        self.statement = self.statement.projection(Projection::Aggregate(aggregate));
+        self.statement = self
+            .statement
+            .projection(Projection::Aggregate(aggregate));
         self
     }
 
@@ -295,12 +295,7 @@ impl<T: FromBatch> Select<T> {
 
     /// Executes the query and returns the first matching row, if any.
     pub async fn one<D: Database>(self, database: &D) -> Result<Option<T>, Error> {
-        Ok(
-            self.limit(1)
-                .all(database)
-                .await?
-                .pop()
-        )
+        Ok(self.limit(1).all(database).await?.pop())
     }
 
     /// Executes the query with a `COUNT(*)` aggregate and returns the count.
@@ -323,15 +318,13 @@ impl<T: FromBatch> Select<T> {
         self,
         database: &D,
     ) -> Result<impl Stream<Item = Result<Vec<T>, Error>>, Error> {
-        Ok(
-            database
-                .query_stream(&self.into_statement())
-                .await?
-                .map(|result| {
-                    result
-                        .and_then(|qr| T::from_batch(qr.into_batch()))
-                        .map_err(Error::from)
-                })
-        )
+        Ok(database
+            .query_stream(&self.into_statement())
+            .await?
+            .map(|result| {
+                result
+                    .and_then(|qr| T::from_batch(qr.into_batch()))
+                    .map_err(Error::from)
+            }))
     }
 }

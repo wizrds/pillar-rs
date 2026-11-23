@@ -1,5 +1,4 @@
-use darling::{ast, util, FromDeriveInput, FromField, FromMeta};
-
+use darling::{FromDeriveInput, FromField, FromMeta, ast, util};
 
 /// Strongly typed TTL attribute: `#[pillar(ttl(column = "...", interval = N, unit = "day"))]`.
 #[derive(Clone, FromMeta)]
@@ -23,7 +22,10 @@ pub enum TtlUnit {
 
 impl FromMeta for TtlUnit {
     fn from_string(value: &str) -> darling::Result<Self> {
-        match value.to_lowercase().trim_end_matches('s') {
+        match value
+            .to_lowercase()
+            .trim_end_matches('s')
+        {
             "second" => Ok(Self::Second),
             "minute" => Ok(Self::Minute),
             "hour" => Ok(Self::Hour),

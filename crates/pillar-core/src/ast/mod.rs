@@ -1,23 +1,22 @@
-pub mod refs;
+pub mod compound;
+pub mod duration;
 pub mod expression;
 pub mod mutation;
+pub mod refs;
 pub mod schema;
 pub mod select;
-pub mod duration;
 pub mod window;
-pub mod compound;
 
-pub use refs::*;
+pub use compound::*;
+pub use duration::*;
 pub use expression::*;
 pub use mutation::*;
+pub use refs::*;
 pub use schema::*;
 pub use select::*;
-pub use duration::*;
 pub use window::*;
-pub use compound::*;
 
 use crate::value::Value;
-
 
 /// A SQL statement that can be executed against a database.
 #[derive(Debug, Clone, PartialEq)]
@@ -112,10 +111,13 @@ impl Statement {
     }
 
     /// Creates a [`Statement::Raw`](crate::ast::Statement::Raw) from a SQL string with positional bind parameters.
-    pub fn raw(
-        sql: impl Into<String>,
-        params: impl IntoIterator<Item = impl Into<Value>>,
-    ) -> Self {
-        Self::Raw(sql.into(), params.into_iter().map(Into::into).collect())
+    pub fn raw(sql: impl Into<String>, params: impl IntoIterator<Item = impl Into<Value>>) -> Self {
+        Self::Raw(
+            sql.into(),
+            params
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+        )
     }
 }

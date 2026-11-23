@@ -1,13 +1,15 @@
-use std::sync::Arc;
 use arrow::datatypes::{Field, FieldRef};
+use std::sync::Arc;
 
 use crate::{
+    ast::{
+        refs::ColumnRef,
+        schema::{ColumnDefinition, ColumnType},
+    },
+    condition::ConditionExpression,
     errors::Error,
     value::Value,
-    condition::ConditionExpression,
-    ast::{refs::ColumnRef, schema::{ColumnDefinition, ColumnType}},
 };
-
 
 /// Compile-time metadata for a single column on a [`Model`](crate::model::Model) or [`View`](crate::view::View).
 #[derive(Debug, Clone)]
@@ -64,10 +66,7 @@ pub struct TypedColumn<T> {
 impl<T> TypedColumn<T> {
     /// Creates a new [`TypedColumn`](crate::column::TypedColumn) with the given column name.
     pub const fn new(name: &'static str) -> Self {
-        Self {
-            name,
-            _marker: std::marker::PhantomData,
-        }
+        Self { name, _marker: std::marker::PhantomData }
     }
 
     /// Returns the column name.
@@ -122,7 +121,13 @@ where
         I: IntoIterator<Item = V>,
         V: Into<Value>,
     {
-        ConditionExpression::in_list(self, values.into_iter().map(Into::into).collect())
+        ConditionExpression::in_list(
+            self,
+            values
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+        )
     }
 
     /// Column value is not in the given list.
@@ -131,7 +136,13 @@ where
         I: IntoIterator<Item = V>,
         V: Into<Value>,
     {
-        ConditionExpression::is_not_in(self, values.into_iter().map(Into::into).collect())
+        ConditionExpression::is_not_in(
+            self,
+            values
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+        )
     }
 
     /// Column is NULL.

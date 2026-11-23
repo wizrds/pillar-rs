@@ -1,20 +1,18 @@
-use std::sync::Arc;
 use arrow::{
     array::ArrayRef,
     datatypes::{DataType, Field, Schema},
     record_batch::RecordBatch,
 };
 use pillar_core::errors::Error;
+use std::sync::Arc;
 
 #[cfg(feature = "uuid")]
 use arrow::array::{Array, FixedSizeBinaryArray, LargeStringArray};
-
 
 pub trait ColumnNormalizer: Send + Sync {
     fn applies(&self, data_type: &DataType) -> bool;
     fn normalize(&self, field: &Field, array: &ArrayRef) -> Result<(Field, ArrayRef), Error>;
 }
-
 
 pub struct BatchNormalizer {
     normalizers: Vec<Box<dyn ColumnNormalizer>>,
@@ -36,7 +34,8 @@ impl BatchNormalizer {
         let mut columns = Vec::with_capacity(batch.num_columns());
 
         for (i, field) in schema.fields().iter().enumerate() {
-            let (f, c) = self.normalizers
+            let (f, c) = self
+                .normalizers
                 .iter()
                 .find(|n| n.applies(field.data_type()))
                 .map(|n| n.normalize(field, batch.column(i)))
@@ -56,7 +55,6 @@ impl Default for BatchNormalizer {
         Self::new()
     }
 }
-
 
 /// Converts `FixedSizeBinary(16)` columns to `LargeUtf8` by interpreting bytes as UUID.
 ///

@@ -6,7 +6,6 @@ use pillar_core::{
 
 use crate::transpile::Transpiler;
 
-
 /// A [`pillar_core::dialect::Dialect`](pillar_core::dialect::Dialect) implementation for ClickHouse.
 pub struct ClickHouseDialect;
 

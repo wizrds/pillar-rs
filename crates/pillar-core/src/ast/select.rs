@@ -1,11 +1,10 @@
 use crate::{
-    condition::ConditionExpression,
     ast::{
-        refs::{ColumnRef, TableRef},
         expression::{AggregateFunction, Expression},
+        refs::{ColumnRef, TableRef},
     },
+    condition::ConditionExpression,
 };
-
 
 /// A single CTE (Common Table Expression) in a `WITH` clause.
 #[derive(Debug, Clone, PartialEq)]
@@ -38,15 +37,14 @@ impl Cte {
     }
 
     /// Specifies the optional column list for this CTE.
-    pub fn columns(
-        mut self,
-        cols: impl IntoIterator<Item = impl Into<ColumnRef>>,
-    ) -> Self {
-        self.columns = cols.into_iter().map(Into::into).collect();
+    pub fn columns(mut self, cols: impl IntoIterator<Item = impl Into<ColumnRef>>) -> Self {
+        self.columns = cols
+            .into_iter()
+            .map(Into::into)
+            .collect();
         self
     }
 }
-
 
 /// A column projection in a [`SelectStatement`](crate::ast::SelectStatement).
 #[derive(Debug, Clone, PartialEq)]
@@ -168,12 +166,20 @@ pub struct OrderBy {
 impl OrderBy {
     /// Orders by the given column ascending.
     pub fn asc(column: impl Into<ColumnRef>) -> Self {
-        Self { column: column.into(), direction: OrderDirection::Asc, nulls: None }
+        Self {
+            column: column.into(),
+            direction: OrderDirection::Asc,
+            nulls: None,
+        }
     }
 
     /// Orders by the given column descending.
     pub fn desc(column: impl Into<ColumnRef>) -> Self {
-        Self { column: column.into(), direction: OrderDirection::Desc, nulls: None }
+        Self {
+            column: column.into(),
+            direction: OrderDirection::Desc,
+            nulls: None,
+        }
     }
 
     /// Sets the NULL ordering for this directive.
@@ -221,7 +227,10 @@ impl FromSource {
 
     /// Creates a `FromSource` from a subquery with a required alias.
     pub fn subquery(query: SelectStatement, alias: impl Into<String>) -> Self {
-        Self::Subquery { query: Box::new(query), alias: alias.into() }
+        Self::Subquery {
+            query: Box::new(query),
+            alias: alias.into(),
+        }
     }
 }
 
@@ -315,7 +324,10 @@ impl SelectStatement {
 
     /// Sets the GROUP BY column list.
     pub fn group_by(mut self, columns: impl IntoIterator<Item = impl Into<ColumnRef>>) -> Self {
-        self.group_by = columns.into_iter().map(Into::into).collect();
+        self.group_by = columns
+            .into_iter()
+            .map(Into::into)
+            .collect();
         self
     }
 

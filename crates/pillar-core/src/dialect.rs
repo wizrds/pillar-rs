@@ -2,7 +2,6 @@ use std::fmt::{Debug, Formatter, Result as FmtResult};
 
 use crate::{ast::Statement, errors::Error, value::Value};
 
-
 /// An optional capability that a backend may or may not support.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Feature {

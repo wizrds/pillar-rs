@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use arrow::{
     array::ArrayRef,
     compute::cast,
@@ -6,13 +5,12 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use pillar_core::errors::Error;
-
+use std::sync::Arc;
 
 pub trait ColumnNormalizer: Send + Sync {
     fn applies(&self, data_type: &DataType) -> bool;
     fn normalize(&self, field: &Field, array: &ArrayRef) -> Result<(Field, ArrayRef), Error>;
 }
-
 
 pub struct BatchNormalizer {
     normalizers: Vec<Box<dyn ColumnNormalizer>>,
@@ -31,7 +29,8 @@ impl BatchNormalizer {
         let mut columns = Vec::with_capacity(batch.num_columns());
 
         for (i, field) in schema.fields().iter().enumerate() {
-            let (f, c) = self.normalizers
+            let (f, c) = self
+                .normalizers
                 .iter()
                 .find(|n| n.applies(field.data_type()))
                 .map(|n| n.normalize(field, batch.column(i)))
@@ -51,7 +50,6 @@ impl Default for BatchNormalizer {
         Self::new()
     }
 }
-
 
 /// Casts any `Timestamp(_, Some(non-UTC tz))` to `Timestamp(_, Some("UTC"))`.
 ///

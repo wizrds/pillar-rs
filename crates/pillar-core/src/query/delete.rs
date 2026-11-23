@@ -1,15 +1,10 @@
 use crate::{
-    ast::{
-        DeleteStatement,
-        Statement,
-        TableRef,
-    },
+    ast::{DeleteStatement, Statement, TableRef},
     condition::{Condition, ConditionExpression},
     database::Database,
     errors::Error,
     model::Model,
 };
-
 
 /// Marker type: the [`Delete`] builder has a WHERE clause or explicit all-rows intent.
 #[derive(Debug, Clone)]
@@ -18,7 +13,6 @@ pub struct Filtered;
 /// Marker type: the [`Delete`] builder has not yet been given a filter.
 #[derive(Debug, Clone)]
 pub struct Unfiltered;
-
 
 /// A builder for a `DELETE` statement targeting a [`Model`] table.
 ///
@@ -91,11 +85,9 @@ impl<M: Model> Delete<M, Filtered> {
 
     /// Executes the delete and returns the number of rows affected.
     pub async fn execute<D: Database>(self, database: &D) -> Result<usize, Error> {
-        Ok(
-            database
-                .execute(&self.into_statement())
-                .await?
-                .rows_affected
-        )
+        Ok(database
+            .execute(&self.into_statement())
+            .await?
+            .rows_affected)
     }
 }

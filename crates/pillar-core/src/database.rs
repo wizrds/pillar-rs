@@ -1,6 +1,6 @@
-use std::sync::Arc;
 use async_trait::async_trait;
 use futures::stream::BoxStream;
+use std::sync::Arc;
 
 use crate::{
     ast::Statement,
@@ -8,7 +8,6 @@ use crate::{
     errors::Error,
     types::{ExecutionResult, QueryResult},
 };
-
 
 /// A connection to a database backend.
 #[async_trait]
@@ -23,7 +22,10 @@ pub trait Database: Send + Sync {
     async fn query(&self, statement: &Statement) -> Result<QueryResult, Error>;
 
     /// Executes a query and returns results as a stream of [`QueryResult`] values.
-    async fn query_stream(&self, statement: &Statement) -> Result<BoxStream<'_, Result<QueryResult, Error>>, Error>;
+    async fn query_stream(
+        &self,
+        statement: &Statement,
+    ) -> Result<BoxStream<'_, Result<QueryResult, Error>>, Error>;
 }
 
 #[async_trait]
@@ -40,7 +42,10 @@ impl Database for &dyn Database {
         (*self).query(statement).await
     }
 
-    async fn query_stream(&self, statement: &Statement) -> Result<BoxStream<'_, Result<QueryResult, Error>>, Error> {
+    async fn query_stream(
+        &self,
+        statement: &Statement,
+    ) -> Result<BoxStream<'_, Result<QueryResult, Error>>, Error> {
         (*self).query_stream(statement).await
     }
 }
@@ -59,7 +64,10 @@ impl Database for Arc<dyn Database> {
         (**self).query(statement).await
     }
 
-    async fn query_stream(&self, statement: &Statement) -> Result<BoxStream<'_, Result<QueryResult, Error>>, Error> {
+    async fn query_stream(
+        &self,
+        statement: &Statement,
+    ) -> Result<BoxStream<'_, Result<QueryResult, Error>>, Error> {
         (**self).query_stream(statement).await
     }
 }
@@ -78,7 +86,10 @@ impl Database for Box<dyn Database> {
         (**self).query(statement).await
     }
 
-    async fn query_stream(&self, statement: &Statement) -> Result<BoxStream<'_, Result<QueryResult, Error>>, Error> {
+    async fn query_stream(
+        &self,
+        statement: &Statement,
+    ) -> Result<BoxStream<'_, Result<QueryResult, Error>>, Error> {
         (**self).query_stream(statement).await
     }
 }
@@ -97,7 +108,10 @@ impl<D: Database> Database for Arc<D> {
         (**self).query(statement).await
     }
 
-    async fn query_stream(&self, statement: &Statement) -> Result<BoxStream<'_, Result<QueryResult, Error>>, Error> {
+    async fn query_stream(
+        &self,
+        statement: &Statement,
+    ) -> Result<BoxStream<'_, Result<QueryResult, Error>>, Error> {
         (**self).query_stream(statement).await
     }
 }
@@ -116,7 +130,10 @@ impl<D: Database> Database for Box<D> {
         (**self).query(statement).await
     }
 
-    async fn query_stream(&self, statement: &Statement) -> Result<BoxStream<'_, Result<QueryResult, Error>>, Error> {
+    async fn query_stream(
+        &self,
+        statement: &Statement,
+    ) -> Result<BoxStream<'_, Result<QueryResult, Error>>, Error> {
         (**self).query_stream(statement).await
     }
 }
@@ -131,4 +148,3 @@ impl<D: Database> AsDynDatabase for D {
         self
     }
 }
-

@@ -7,15 +7,14 @@ use arrow::datatypes::{DataType, Field};
 use arrow::datatypes::TimeUnit;
 
 use crate::{
-    errors::Error,
-    value::Value,
     ast::{
+        duration::TtlClause,
         refs::{ColumnRef, TableRef},
         select::SelectStatement,
-        duration::TtlClause,
     },
+    errors::Error,
+    value::Value,
 };
-
 
 /// The data type of a column in the database schema.
 #[derive(Debug, Clone, PartialEq)]
@@ -46,7 +45,9 @@ pub enum ColumnType {
     #[cfg(feature = "uuid")]
     Uuid,
     /// High-precision timestamp with sub-second precision digits (0 to 9).
-    DateTime64 { precision: u8 },
+    DateTime64 {
+        precision: u8,
+    },
     /// String optimized for low-cardinality data such as enums or status codes.
     LowCardinalityString,
     /// Fixed-length string of exactly `n` bytes.
@@ -120,9 +121,11 @@ impl ColumnType {
             ColumnType::String | ColumnType::LowCardinalityString => Ok(DataType::LargeUtf8),
             ColumnType::Binary => Ok(DataType::LargeBinary),
             ColumnType::FixedString(n) => Ok(DataType::FixedSizeBinary(*n as i32)),
-            ColumnType::List(inner) => Ok(DataType::LargeList(Arc::new(
-                Field::new("item", inner.to_arrow_data_type()?, true),
-            ))),
+            ColumnType::List(inner) => Ok(DataType::LargeList(Arc::new(Field::new(
+                "item",
+                inner.to_arrow_data_type()?,
+                true,
+            )))),
             ColumnType::Map(key, value) => Ok(DataType::Map(
                 Arc::new(Field::new(
                     "entries",
@@ -148,9 +151,7 @@ impl ColumnType {
             #[cfg(feature = "uuid")]
             ColumnType::Uuid => Ok(DataType::FixedSizeBinary(16)),
             ColumnType::Nullable(inner) => inner.to_arrow_data_type(),
-            _ => Err(Error::serialization(
-                "column type has no Arrow equivalent",
-            )),
+            _ => Err(Error::serialization("column type has no Arrow equivalent")),
         }
     }
 }
@@ -165,7 +166,10 @@ pub struct AggregateStateFunction {
 impl AggregateStateFunction {
     /// Creates a new [`AggregateStateFunction`](crate::ast::AggregateStateFunction) with the given function and argument types.
     pub fn new(function: AggregateFn, arg_types: impl IntoIterator<Item = ColumnType>) -> Self {
-        Self { function, arg_types: arg_types.into_iter().collect() }
+        Self {
+            function,
+            arg_types: arg_types.into_iter().collect(),
+        }
     }
 }
 
@@ -327,7 +331,8 @@ impl CreateTableStatement {
 
     /// Adds a backend-specific table option.
     pub fn option(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
-        self.options.insert(key.into(), value.into());
+        self.options
+            .insert(key.into(), value.into());
         self
     }
 
@@ -350,7 +355,12 @@ pub struct AlterTableStatement {
 impl AlterTableStatement {
     /// Creates a new [`AlterTableStatement`](crate::ast::AlterTableStatement) for the given table name.
     pub fn new(name: impl Into<TableRef>) -> Self {
-        Self { name: name.into().name, add_columns: Vec::new(), drop_columns: Vec::new(), ttl: None }
+        Self {
+            name: name.into().name,
+            add_columns: Vec::new(),
+            drop_columns: Vec::new(),
+            ttl: None,
+        }
     }
 
     /// Sets the columns to add.
@@ -367,7 +377,10 @@ impl AlterTableStatement {
 
     /// Sets the column names to drop.
     pub fn drop_columns(mut self, columns: impl IntoIterator<Item = impl Into<ColumnRef>>) -> Self {
-        self.drop_columns = columns.into_iter().map(Into::into).collect();
+        self.drop_columns = columns
+            .into_iter()
+            .map(Into::into)
+            .collect();
         self
     }
 
@@ -440,7 +453,8 @@ impl CreateViewStatement {
 
     /// Adds a backend-specific view option.
     pub fn option(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
-        self.options.insert(key.into(), value.into());
+        self.options
+            .insert(key.into(), value.into());
         self
     }
 }
@@ -489,7 +503,8 @@ impl CreateMaterializedViewStatement {
 
     /// Adds a backend-specific view option.
     pub fn option(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
-        self.options.insert(key.into(), value.into());
+        self.options
+            .insert(key.into(), value.into());
         self
     }
 }
@@ -505,7 +520,11 @@ pub struct DropViewStatement {
 impl DropViewStatement {
     /// Creates a new [`DropViewStatement`](crate::ast::DropViewStatement) for the given view name.
     pub fn new(name: impl Into<TableRef>) -> Self {
-        Self { name: name.into().name, if_exists: false, materialized: false }
+        Self {
+            name: name.into().name,
+            if_exists: false,
+            materialized: false,
+        }
     }
 
     /// Adds `IF EXISTS` to the statement.

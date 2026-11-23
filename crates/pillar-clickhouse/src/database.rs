@@ -1,9 +1,9 @@
-use std::collections::VecDeque;
 use arrow::buffer::Buffer;
 use arrow::ipc::reader::StreamDecoder;
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
-use futures::stream::{self, Stream, BoxStream, StreamExt};
+use futures::stream::{self, BoxStream, Stream, StreamExt};
+use std::collections::VecDeque;
 
 use pillar_core::{
     ast::Statement,
@@ -36,7 +36,10 @@ impl ClickHouseDatabase {
         ClickHouseDatabaseBuilder::new(url)
     }
 
-    fn bind_params(mut query: clickhouse::query::Query, params: &[Value]) -> clickhouse::query::Query {
+    fn bind_params(
+        mut query: clickhouse::query::Query,
+        params: &[Value],
+    ) -> clickhouse::query::Query {
         for param in params {
             query = match param {
                 Value::Null => query.bind(Option::<String>::None),
@@ -59,7 +62,10 @@ impl ClickHouseDatabase {
                 #[cfg(feature = "chrono")]
                 Value::Time(v) => query.bind(v.to_string()),
                 #[cfg(feature = "chrono")]
-                Value::DateTime(v) => query.bind(v.format("%Y-%m-%d %H:%M:%S").to_string()),
+                Value::DateTime(v) => query.bind(
+                    v.format("%Y-%m-%d %H:%M:%S")
+                        .to_string(),
+                ),
                 #[cfg(feature = "uuid")]
                 Value::Uuid(v) => query.bind(v.to_string()),
             };
@@ -68,7 +74,9 @@ impl ClickHouseDatabase {
         query
     }
 
-    fn decode_stream(cursor: clickhouse::query::BytesCursor) -> impl Stream<Item = Result<RecordBatch, Error>> {
+    fn decode_stream(
+        cursor: clickhouse::query::BytesCursor,
+    ) -> impl Stream<Item = Result<RecordBatch, Error>> {
         stream::unfold(
             (cursor, StreamDecoder::new(), VecDeque::<RecordBatch>::new(), false),
             |(mut cursor, mut decoder, mut pending, done)| async move {
@@ -82,10 +90,18 @@ impl ClickHouseDatabase {
 
                 loop {
                     match cursor.next().await {
-                        Err(e) => return Some((Err(Error::sourced_connection(e)), (cursor, decoder, pending, true))),
+                        Err(e) => {
+                            return Some((
+                                Err(Error::sourced_connection(e)),
+                                (cursor, decoder, pending, true),
+                            ));
+                        }
                         Ok(None) => {
                             return match decoder.finish() {
-                                Err(e) => Some((Err(Error::sourced_unexpected(e)), (cursor, decoder, pending, true))),
+                                Err(e) => Some((
+                                    Err(Error::sourced_unexpected(e)),
+                                    (cursor, decoder, pending, true),
+                                )),
                                 Ok(()) => None,
                             };
                         }
@@ -94,7 +110,12 @@ impl ClickHouseDatabase {
 
                             while !buf.is_empty() {
                                 match decoder.decode(&mut buf) {
-                                    Err(e) => return Some((Err(Error::sourced_unexpected(e)), (cursor, decoder, pending, true))),
+                                    Err(e) => {
+                                        return Some((
+                                            Err(Error::sourced_unexpected(e)),
+                                            (cursor, decoder, pending, true),
+                                        ));
+                                    }
                                     Ok(Some(batch)) => pending.push_back(batch),
                                     Ok(None) => {}
                                 }
@@ -162,7 +183,10 @@ impl Database for ClickHouseDatabase {
                     .fetch_bytes("ArrowStream")
                     .map_err(Error::sourced_connection)?,
             )
-            .map(|r| r.and_then(|b| self.normalizer.normalize(b)).map(QueryResult::from)),
+            .map(|r| {
+                r.and_then(|b| self.normalizer.normalize(b))
+                    .map(QueryResult::from)
+            }),
         ))
     }
 }
@@ -208,14 +232,14 @@ impl ClickHouseDatabaseBuilder {
 
     /// Adds a ClickHouse session setting applied to every query on this client.
     pub fn setting(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
-        self.settings.push((name.into(), value.into()));
+        self.settings
+            .push((name.into(), value.into()));
         self
     }
 
     /// Builds the [`ClickHouseDatabase`](crate::database::ClickHouseDatabase).
     pub fn build(self) -> ClickHouseDatabase {
-        let mut client = clickhouse::Client::default()
-            .with_url(self.url);
+        let mut client = clickhouse::Client::default().with_url(self.url);
 
         if let Some(db) = self.database {
             client = client.with_database(db);

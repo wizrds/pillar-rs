@@ -1,6 +1,5 @@
 use crate::ast::select::SelectStatement;
 
-
 /// A set operation combining two or more `SELECT` statements.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CompoundSelect {
@@ -11,11 +10,7 @@ pub struct CompoundSelect {
 
 impl CompoundSelect {
     /// Creates a new compound select statement with the given operator.
-    pub fn new(
-        operator: SetOperator,
-        left: SelectStatement,
-        right: SelectStatement,
-    ) -> Self {
+    pub fn new(operator: SetOperator, left: SelectStatement, right: SelectStatement) -> Self {
         Self {
             operator,
             left: Box::new(left),

@@ -5,13 +5,12 @@ mod attr;
 mod column;
 mod condition;
 mod from_batch;
-mod to_row;
 mod model;
+mod to_row;
 mod view;
 
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, DeriveInput};
-
+use syn::{DeriveInput, parse_macro_input};
 
 /// Derives [`pillar::model::Model`](pillar_core::model::Model) for a struct, generating a companion
 /// `Model` struct, `Column` struct, and typed column accessors in the same scope.

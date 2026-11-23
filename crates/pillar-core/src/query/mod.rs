@@ -1,21 +1,14 @@
-mod select;
-mod insert;
-mod update;
 mod delete;
+mod insert;
+mod select;
+mod update;
 
-pub use select::Select;
-pub use insert::Insert;
-pub use update::Update;
 pub use delete::{Delete, Filtered, Unfiltered};
+pub use insert::Insert;
+pub use select::Select;
+pub use update::Update;
 
-use crate::{
-    ast::FromSource,
-    convert::FromBatch,
-    errors::Error,
-    model::Model,
-    view::View,
-};
-
+use crate::{ast::FromSource, convert::FromBatch, errors::Error, model::Model, view::View};
 
 /// Provides query and mutation entry points for any type implementing [`Model`].
 pub trait EntityOps: Model + FromBatch + Sized {

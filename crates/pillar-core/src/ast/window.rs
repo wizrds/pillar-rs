@@ -1,6 +1,5 @@
 use crate::ast::refs::ColumnRef;
 
-
 /// A window function expression applied with an OVER clause.
 #[derive(Debug, Clone, PartialEq)]
 pub struct WindowFunction {
@@ -106,10 +105,7 @@ pub enum WindowFunc {
     /// `LAST_VALUE(column)`.
     LastValue(ColumnRef),
     /// `NTH_VALUE(column, n)`.
-    NthValue {
-        column: ColumnRef,
-        n: u64,
-    },
+    NthValue { column: ColumnRef, n: u64 },
     /// `NTILE(n)`.
     Ntile(u64),
     /// `PERCENT_RANK()`.
@@ -137,11 +133,11 @@ impl WindowSpec {
     }
 
     /// Sets the PARTITION BY columns.
-    pub fn partition_by(
-        mut self,
-        cols: impl IntoIterator<Item = impl Into<ColumnRef>>,
-    ) -> Self {
-        self.partition_by = cols.into_iter().map(Into::into).collect();
+    pub fn partition_by(mut self, cols: impl IntoIterator<Item = impl Into<ColumnRef>>) -> Self {
+        self.partition_by = cols
+            .into_iter()
+            .map(Into::into)
+            .collect();
         self
     }
 

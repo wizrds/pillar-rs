@@ -1,18 +1,18 @@
 use pillar_core::{
     ast::{
-        AggregateFunction, AlterTableStatement, BinaryOperator, ColumnDefinition, ColumnType,
-        CompoundSelect, CountArg, Cte, CreateMaterializedViewStatement, CreateTableStatement,
-        CreateViewStatement, DeleteStatement, DropTableStatement, DropViewStatement, Expression,
-        FrameBound, FrameUnit, FromSource, InsertBody, InsertStatement, IntervalUnit, JoinType,
-        NullsOrder, OnConflictAction, OrderDirection, Projection, SelectStatement, SetOperator,
-        Statement, UpdateStatement, AggregateFn, WindowFunc, WindowFunction, WindowSpec,
+        AggregateFn, AggregateFunction, AlterTableStatement, BinaryOperator, ColumnDefinition,
+        ColumnType, CompoundSelect, CountArg, CreateMaterializedViewStatement,
+        CreateTableStatement, CreateViewStatement, Cte, DeleteStatement, DropTableStatement,
+        DropViewStatement, Expression, FrameBound, FrameUnit, FromSource, InsertBody,
+        InsertStatement, IntervalUnit, JoinType, NullsOrder, OnConflictAction, OrderDirection,
+        Projection, SelectStatement, SetOperator, Statement, UpdateStatement, WindowFunc,
+        WindowFunction, WindowSpec,
     },
     condition::{ComparisonOp, ConditionExpression},
-    errors::Error,
     dialect::PreparedStatement,
+    errors::Error,
     value::{ToSql, Value},
 };
-
 
 pub struct Transpiler {
     params: Vec<Value>,
@@ -56,7 +56,11 @@ impl Transpiler {
         }
 
         let has_recursive = ctes.iter().any(|c| c.recursive);
-        let prefix = if has_recursive { "WITH RECURSIVE " } else { "WITH " };
+        let prefix = if has_recursive {
+            "WITH RECURSIVE "
+        } else {
+            "WITH "
+        };
 
         let rendered = ctes
             .iter()
@@ -66,7 +70,11 @@ impl Transpiler {
                 } else {
                     format!(
                         " ({})",
-                        cte.columns.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", "),
+                        cte.columns
+                            .iter()
+                            .map(|c| c.name.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", "),
                     )
                 };
                 let query = self.select(&cte.query, inline)?;
@@ -84,7 +92,11 @@ impl Transpiler {
         let mut sql = format!(
             "{}{} {} FROM {}",
             with,
-            if stmt.distinct { "SELECT DISTINCT" } else { "SELECT" },
+            if stmt.distinct {
+                "SELECT DISTINCT"
+            } else {
+                "SELECT"
+            },
             stmt.projections
                 .iter()
                 .map(|p| self.projection(p, inline))
@@ -118,7 +130,11 @@ impl Transpiler {
         if !stmt.group_by.is_empty() {
             sql.push_str(&format!(
                 " GROUP BY {}",
-                stmt.group_by.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", "),
+                stmt.group_by
+                    .iter()
+                    .map(|c| c.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", "),
             ));
         }
 
@@ -161,7 +177,12 @@ impl Transpiler {
     }
 
     fn insert(&mut self, stmt: &InsertStatement) -> Result<String, Error> {
-        let cols = stmt.columns.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", ");
+        let cols = stmt
+            .columns
+            .iter()
+            .map(|c| c.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
 
         let body = match &stmt.body {
             InsertBody::Values(rows) => {
@@ -205,7 +226,12 @@ impl Transpiler {
         };
 
         if let Some(on_conflict) = &stmt.on_conflict {
-            let targets = on_conflict.target.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", ");
+            let targets = on_conflict
+                .target
+                .iter()
+                .map(|c| c.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
 
             match &on_conflict.action {
                 OnConflictAction::DoNothing => {
@@ -216,7 +242,11 @@ impl Transpiler {
                     sql.push_str(&format!(
                         " ON CONFLICT ({targets}) DO UPDATE SET {}",
                         set.iter()
-                            .map(|(col, val)| format!("{} = {}", col.name, self.placeholder(val.clone(), false)))
+                            .map(|(col, val)| format!(
+                                "{} = {}",
+                                col.name,
+                                self.placeholder(val.clone(), false)
+                            ))
                             .collect::<Vec<_>>()
                             .join(", "),
                     ));
@@ -231,7 +261,11 @@ impl Transpiler {
         if let Some(returning) = &stmt.returning {
             sql.push_str(&format!(
                 " RETURNING {}",
-                returning.iter().map(|p| self.projection(p, false)).collect::<Vec<_>>().join(", "),
+                returning
+                    .iter()
+                    .map(|p| self.projection(p, false))
+                    .collect::<Vec<_>>()
+                    .join(", "),
             ));
         }
 
@@ -248,7 +282,11 @@ impl Transpiler {
             stmt.table.name,
             stmt.set
                 .iter()
-                .map(|(col, val)| format!("{} = {}", col.name, self.placeholder(val.clone(), false)))
+                .map(|(col, val)| format!(
+                    "{} = {}",
+                    col.name,
+                    self.placeholder(val.clone(), false)
+                ))
                 .collect::<Vec<_>>()
                 .join(", "),
         );
@@ -260,7 +298,11 @@ impl Transpiler {
         if let Some(returning) = &stmt.returning {
             sql.push_str(&format!(
                 " RETURNING {}",
-                returning.iter().map(|p| self.projection(p, false)).collect::<Vec<_>>().join(", "),
+                returning
+                    .iter()
+                    .map(|p| self.projection(p, false))
+                    .collect::<Vec<_>>()
+                    .join(", "),
             ));
         }
 
@@ -277,7 +319,11 @@ impl Transpiler {
         if let Some(returning) = &stmt.returning {
             sql.push_str(&format!(
                 " RETURNING {}",
-                returning.iter().map(|p| self.projection(p, false)).collect::<Vec<_>>().join(", "),
+                returning
+                    .iter()
+                    .map(|p| self.projection(p, false))
+                    .collect::<Vec<_>>()
+                    .join(", "),
             ));
         }
 
@@ -299,7 +345,11 @@ impl Transpiler {
     fn create_table(&mut self, stmt: &CreateTableStatement) -> Result<String, Error> {
         Ok(format!(
             "CREATE TABLE{} {} ({})",
-            if stmt.if_not_exists { " IF NOT EXISTS" } else { "" },
+            if stmt.if_not_exists {
+                " IF NOT EXISTS"
+            } else {
+                ""
+            },
             stmt.name,
             stmt.columns
                 .iter()
@@ -344,21 +394,25 @@ impl Transpiler {
         Ok(format!(
             "CREATE{} VIEW{} {} AS {}",
             if stmt.or_replace { " OR REPLACE" } else { "" },
-            if stmt.if_not_exists { " IF NOT EXISTS" } else { "" },
+            if stmt.if_not_exists {
+                " IF NOT EXISTS"
+            } else {
+                ""
+            },
             stmt.name,
             self.select(&stmt.query, true)?,
         ))
     }
 
-    fn create_materialized_view(&mut self, stmt: &CreateMaterializedViewStatement) -> Result<String, Error> {
+    fn create_materialized_view(
+        &mut self,
+        stmt: &CreateMaterializedViewStatement,
+    ) -> Result<String, Error> {
         // When a TO target is specified, the target table becomes the view on DuckDB.
         // We drop the pre-created table and replace it with a view of the same name,
         // so downstream reads from the target name work on both backends.
         let (view_name, preamble) = match &stmt.to_table {
-            Some(target) => (
-                target.as_str(),
-                format!("DROP TABLE IF EXISTS {target}; "),
-            ),
+            Some(target) => (target.as_str(), format!("DROP TABLE IF EXISTS {target}; ")),
             None => (stmt.name.as_str(), String::new()),
         };
 
@@ -366,7 +420,11 @@ impl Transpiler {
             "{}CREATE{} VIEW{} {} AS {}",
             preamble,
             if stmt.or_replace { " OR REPLACE" } else { "" },
-            if stmt.if_not_exists { " IF NOT EXISTS" } else { "" },
+            if stmt.if_not_exists {
+                " IF NOT EXISTS"
+            } else {
+                ""
+            },
             view_name,
             self.select(&stmt.query, true)?,
         ))
@@ -396,7 +454,9 @@ impl Transpiler {
             ColumnType::String => "VARCHAR".to_string(),
             ColumnType::Binary => "BLOB".to_string(),
             ColumnType::List(inner) => format!("{}[]", self.column_type(inner)),
-            ColumnType::Map(k, v) => format!("MAP({}, {})", self.column_type(k), self.column_type(v)),
+            ColumnType::Map(k, v) => {
+                format!("MAP({}, {})", self.column_type(k), self.column_type(v))
+            }
             #[cfg(feature = "chrono")]
             ColumnType::Date => "DATE".to_string(),
             #[cfg(feature = "chrono")]
@@ -412,17 +472,25 @@ impl Transpiler {
                 // DuckDB has no aggregate state storage; use the result type of the function
                 match &state.function {
                     AggregateFn::Count => "UBIGINT".to_string(),
-                    AggregateFn::Sum | AggregateFn::Avg => state.arg_types.first()
+                    AggregateFn::Sum | AggregateFn::Avg => state
+                        .arg_types
+                        .first()
                         .map(|t| self.column_type(t))
                         .unwrap_or_else(|| "DOUBLE".to_string()),
-                    AggregateFn::Min | AggregateFn::Max => state.arg_types.first()
+                    AggregateFn::Min | AggregateFn::Max => state
+                        .arg_types
+                        .first()
                         .map(|t| self.column_type(t))
                         .unwrap_or_else(|| "DOUBLE".to_string()),
                     AggregateFn::Uniq => "UBIGINT".to_string(),
-                    AggregateFn::Quantile(_) => state.arg_types.first()
+                    AggregateFn::Quantile(_) => state
+                        .arg_types
+                        .first()
                         .map(|t| self.column_type(t))
                         .unwrap_or_else(|| "DOUBLE".to_string()),
-                    AggregateFn::TopK(_) => state.arg_types.first()
+                    AggregateFn::TopK(_) => state
+                        .arg_types
+                        .first()
                         .map(|t| format!("{}[]", self.column_type(t)))
                         .unwrap_or_else(|| "VARCHAR[]".to_string()),
                     AggregateFn::Histogram(_) => "DOUBLE[]".to_string(),
@@ -518,15 +586,13 @@ impl Transpiler {
 
             Expression::Window(wf) => self.window_function(wf, inline),
 
-            Expression::Subquery(query) => {
-                self.select(query, inline).unwrap_or_else(|_| "NULL".to_string())
-            }
+            Expression::Subquery(query) => self
+                .select(query, inline)
+                .unwrap_or_else(|_| "NULL".to_string()),
 
-            Expression::Interval(i) => format!(
-                "INTERVAL '{} {}'",
-                i.value,
-                self.interval_unit(&i.unit),
-            ),
+            Expression::Interval(i) => {
+                format!("INTERVAL '{} {}'", i.value, self.interval_unit(&i.unit),)
+            }
 
             Expression::TimeBucket { interval, column } => format!(
                 "time_bucket(INTERVAL '{} {}', {})",
@@ -564,22 +630,18 @@ impl Transpiler {
             WindowFunc::FirstValue(col) => format!("FIRST_VALUE({})", col.name),
             WindowFunc::LastValue(col) => format!("LAST_VALUE({})", col.name),
             WindowFunc::NthValue { column, n } => format!("NTH_VALUE({}, {n})", column.name),
-            WindowFunc::Lag { column, offset, default } => {
-                match (offset, default) {
-                    (None, None) => format!("LAG({})", column.name),
-                    (Some(o), None) => format!("LAG({}, {o})", column.name),
-                    (Some(o), Some(d)) => format!("LAG({}, {o}, {})", column.name, d.to_sql()),
-                    (None, Some(d)) => format!("LAG({}, 1, {})", column.name, d.to_sql()),
-                }
-            }
-            WindowFunc::Lead { column, offset, default } => {
-                match (offset, default) {
-                    (None, None) => format!("LEAD({})", column.name),
-                    (Some(o), None) => format!("LEAD({}, {o})", column.name),
-                    (Some(o), Some(d)) => format!("LEAD({}, {o}, {})", column.name, d.to_sql()),
-                    (None, Some(d)) => format!("LEAD({}, 1, {})", column.name, d.to_sql()),
-                }
-            }
+            WindowFunc::Lag { column, offset, default } => match (offset, default) {
+                (None, None) => format!("LAG({})", column.name),
+                (Some(o), None) => format!("LAG({}, {o})", column.name),
+                (Some(o), Some(d)) => format!("LAG({}, {o}, {})", column.name, d.to_sql()),
+                (None, Some(d)) => format!("LAG({}, 1, {})", column.name, d.to_sql()),
+            },
+            WindowFunc::Lead { column, offset, default } => match (offset, default) {
+                (None, None) => format!("LEAD({})", column.name),
+                (Some(o), None) => format!("LEAD({}, {o})", column.name),
+                (Some(o), Some(d)) => format!("LEAD({}, {o}, {})", column.name, d.to_sql()),
+                (None, Some(d)) => format!("LEAD({}, 1, {})", column.name, d.to_sql()),
+            },
         }
     }
 
@@ -589,7 +651,11 @@ impl Transpiler {
         if !spec.partition_by.is_empty() {
             parts.push(format!(
                 "PARTITION BY {}",
-                spec.partition_by.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", "),
+                spec.partition_by
+                    .iter()
+                    .map(|c| c.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", "),
             ));
         }
 
@@ -650,19 +716,27 @@ impl Transpiler {
     fn aggregate(&self, agg: &AggregateFunction) -> String {
         match agg {
             AggregateFunction::Count(CountArg::All) => "CAST(COUNT(*) AS UBIGINT)".to_string(),
-            AggregateFunction::Count(CountArg::Column(col)) => format!("CAST(COUNT({}) AS UBIGINT)", col.name),
-            AggregateFunction::Count(CountArg::Distinct(col)) => format!("CAST(COUNT(DISTINCT {}) AS UBIGINT)", col.name),
+            AggregateFunction::Count(CountArg::Column(col)) => {
+                format!("CAST(COUNT({}) AS UBIGINT)", col.name)
+            }
+            AggregateFunction::Count(CountArg::Distinct(col)) => {
+                format!("CAST(COUNT(DISTINCT {}) AS UBIGINT)", col.name)
+            }
             AggregateFunction::Sum(col) => format!("CAST(SUM({}) AS UBIGINT)", col.name),
             AggregateFunction::Avg(col) => format!("AVG({})", col.name),
             AggregateFunction::Min(col) => format!("MIN({})", col.name),
             AggregateFunction::Max(col) => format!("MAX({})", col.name),
-            AggregateFunction::ApproxCountDistinct(col) => format!("APPROX_COUNT_DISTINCT({})", col.name),
+            AggregateFunction::ApproxCountDistinct(col) => {
+                format!("APPROX_COUNT_DISTINCT({})", col.name)
+            }
             AggregateFunction::Uniq(col) => format!("APPROX_COUNT_DISTINCT({})", col.name),
             AggregateFunction::Quantile { level, column } => {
                 format!("PERCENTILE_CONT({level}) WITHIN GROUP (ORDER BY {})", column.name)
             }
             AggregateFunction::TopK { k, column } => format!("APPROX_TOP_K({}, {k})", column.name),
-            AggregateFunction::Histogram { bins: _, column } => format!("histogram({})", column.name),
+            AggregateFunction::Histogram { bins: _, column } => {
+                format!("histogram({})", column.name)
+            }
             // State writes plain aggregates; Merge reads the stored value directly
             AggregateFunction::State(inner) => self.aggregate(inner),
             AggregateFunction::Merge(inner) => self.merge_column(inner),
@@ -670,20 +744,23 @@ impl Transpiler {
     }
 
     fn merge_column(&self, inner: &AggregateFunction) -> String {
-        format!("ANY_VALUE({})", match inner {
-            AggregateFunction::Count(CountArg::Column(col)) => col.name.clone(),
-            AggregateFunction::Count(CountArg::Distinct(col)) => col.name.clone(),
-            AggregateFunction::Sum(col) => col.name.clone(),
-            AggregateFunction::Avg(col) => col.name.clone(),
-            AggregateFunction::Min(col) => col.name.clone(),
-            AggregateFunction::Max(col) => col.name.clone(),
-            AggregateFunction::Uniq(col) => col.name.clone(),
-            AggregateFunction::ApproxCountDistinct(col) => col.name.clone(),
-            AggregateFunction::Quantile { column, .. } => column.name.clone(),
-            AggregateFunction::TopK { column, .. } => column.name.clone(),
-            AggregateFunction::Histogram { column, .. } => column.name.clone(),
-            _ => return self.aggregate(inner),
-        })
+        format!(
+            "ANY_VALUE({})",
+            match inner {
+                AggregateFunction::Count(CountArg::Column(col)) => col.name.clone(),
+                AggregateFunction::Count(CountArg::Distinct(col)) => col.name.clone(),
+                AggregateFunction::Sum(col) => col.name.clone(),
+                AggregateFunction::Avg(col) => col.name.clone(),
+                AggregateFunction::Min(col) => col.name.clone(),
+                AggregateFunction::Max(col) => col.name.clone(),
+                AggregateFunction::Uniq(col) => col.name.clone(),
+                AggregateFunction::ApproxCountDistinct(col) => col.name.clone(),
+                AggregateFunction::Quantile { column, .. } => column.name.clone(),
+                AggregateFunction::TopK { column, .. } => column.name.clone(),
+                AggregateFunction::Histogram { column, .. } => column.name.clone(),
+                _ => return self.aggregate(inner),
+            }
+        )
     }
 
     pub fn transpile(&mut self, statement: &Statement) -> Result<String, Error> {
@@ -703,17 +780,15 @@ impl Transpiler {
             Statement::DropView(s) => self.drop_view(s),
             Statement::Compound(s) => self.compound(s),
             Statement::Raw(sql, params) => {
-                self.params.extend(params.iter().cloned());
+                self.params
+                    .extend(params.iter().cloned());
                 Ok(sql.clone())
             }
         }
     }
 
     pub fn finish(self, sql: String) -> PreparedStatement {
-        PreparedStatement {
-            sql,
-            params: self.params,
-        }
+        PreparedStatement { sql, params: self.params }
     }
 
     pub fn condition(&mut self, expr: &ConditionExpression, inline: bool) -> String {
@@ -765,11 +840,19 @@ impl Transpiler {
             ConditionExpression::IsNotNull(col) => format!("{} IS NOT NULL", col.name),
 
             ConditionExpression::Like(col, pattern) => {
-                format!("{} LIKE {}", col.name, self.placeholder(Value::String(pattern.clone()), inline))
+                format!(
+                    "{} LIKE {}",
+                    col.name,
+                    self.placeholder(Value::String(pattern.clone()), inline)
+                )
             }
 
             ConditionExpression::NotLike(col, pattern) => {
-                format!("{} NOT LIKE {}", col.name, self.placeholder(Value::String(pattern.clone()), inline))
+                format!(
+                    "{} NOT LIKE {}",
+                    col.name,
+                    self.placeholder(Value::String(pattern.clone()), inline)
+                )
             }
 
             ConditionExpression::Between(col, low, high) => format!(
@@ -811,44 +894,49 @@ impl Transpiler {
             ),
 
             ConditionExpression::InSubquery(col, query) => {
-                let sql = self.select(query, inline).unwrap_or_default();
+                let sql = self
+                    .select(query, inline)
+                    .unwrap_or_default();
                 format!("{} IN ({sql})", col.name)
             }
 
             ConditionExpression::NotInSubquery(col, query) => {
-                let sql = self.select(query, inline).unwrap_or_default();
+                let sql = self
+                    .select(query, inline)
+                    .unwrap_or_default();
                 format!("{} NOT IN ({sql})", col.name)
             }
 
             ConditionExpression::Exists(query) => {
-                let sql = self.select(query, inline).unwrap_or_default();
+                let sql = self
+                    .select(query, inline)
+                    .unwrap_or_default();
                 format!("EXISTS ({sql})")
             }
 
             ConditionExpression::NotExists(query) => {
-                let sql = self.select(query, inline).unwrap_or_default();
+                let sql = self
+                    .select(query, inline)
+                    .unwrap_or_default();
                 format!("NOT EXISTS ({sql})")
             }
         }
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use pillar_core::{
         ast::{
-            AggregateFunction, AlterTableStatement, ColumnDefinition,
-            CreateTableStatement, DeleteStatement, Expression, InsertStatement,
-            Interval, Projection, SelectStatement, Statement, TtlClause,
-            UpdateStatement, AggregateFn, ColumnType,
+            AggregateFn, AggregateFunction, AlterTableStatement, ColumnDefinition, ColumnType,
+            CreateTableStatement, DeleteStatement, Expression, InsertStatement, Interval,
+            Projection, SelectStatement, Statement, TtlClause, UpdateStatement,
         },
         condition::ConditionExpression,
         value::Value,
     };
 
     use super::Transpiler;
-
 
     fn transpile(statement: Statement) -> (String, Vec<Value>) {
         let mut t = Transpiler::new();
@@ -872,8 +960,7 @@ mod tests {
     #[test]
     fn test_select_with_filter() {
         let (sql, params) = transpile(Statement::select(
-            SelectStatement::new("events")
-                .where_clause(ConditionExpression::eq("id", 42i64)),
+            SelectStatement::new("events").where_clause(ConditionExpression::eq("id", 42i64)),
         ));
 
         assert_eq!(sql, "SELECT * FROM events WHERE id = $1");
@@ -905,11 +992,14 @@ mod tests {
         ));
 
         assert_eq!(sql, "INSERT INTO events (id, name, count) VALUES ($1, $2, $3)");
-        assert_eq!(params, vec![
-            Value::Int64(1),
-            Value::String("foo".into()),
-            Value::Int32(5),
-        ]);
+        assert_eq!(
+            params,
+            vec![
+                Value::Int64(1),
+                Value::String("foo".into()),
+                Value::Int32(5),
+            ]
+        );
     }
 
     #[test]
@@ -924,12 +1014,15 @@ mod tests {
         ));
 
         assert_eq!(sql, "INSERT INTO events (id, name) VALUES ($1, $2), ($3, $4)");
-        assert_eq!(params, vec![
-            Value::Int64(1),
-            Value::String("a".into()),
-            Value::Int64(2),
-            Value::String("b".into()),
-        ]);
+        assert_eq!(
+            params,
+            vec![
+                Value::Int64(1),
+                Value::String("a".into()),
+                Value::Int64(2),
+                Value::String("b".into()),
+            ]
+        );
     }
 
     #[test]
@@ -947,8 +1040,7 @@ mod tests {
     #[test]
     fn test_delete_with_filter() {
         let (sql, params) = transpile(Statement::delete(
-            DeleteStatement::new("events")
-                .where_clause(ConditionExpression::eq("id", 1i64)),
+            DeleteStatement::new("events").where_clause(ConditionExpression::eq("id", 1i64)),
         ));
 
         assert_eq!(sql, "DELETE FROM events WHERE id = $1");
@@ -965,12 +1057,10 @@ mod tests {
 
     #[test]
     fn test_condition_and() {
-        let (sql, params) = transpile(Statement::select(
-            SelectStatement::new("events").where_clause(
-                ConditionExpression::eq("id", 1i64)
-                    .and(ConditionExpression::eq("count", 6i32)),
-            ),
-        ));
+        let (sql, params) =
+            transpile(Statement::select(SelectStatement::new("events").where_clause(
+                ConditionExpression::eq("id", 1i64).and(ConditionExpression::eq("count", 6i32)),
+            )));
 
         assert_eq!(sql, "SELECT * FROM events WHERE (id = $1 AND count = $2)");
         assert_eq!(params, vec![Value::Int64(1), Value::Int32(6)]);
@@ -990,30 +1080,42 @@ mod tests {
 
     #[test]
     fn test_column_types_map_correctly() {
-        let (sql, params) = transpile(Statement::create_table(
-            CreateTableStatement::new("events")
-                .columns([
-                    col("id", ColumnType::UInt64),
-                    col("name", ColumnType::LowCardinalityString),
-                    col("event_time", ColumnType::datetime64(3)),
-                    col("tag", ColumnType::fixed_string(16)),
-                ]),
-        ));
-        assert_eq!(sql, "CREATE TABLE events (id UBIGINT NOT NULL, name VARCHAR NOT NULL, event_time TIMESTAMP NOT NULL, tag CHAR(16) NOT NULL)");
+        let (sql, params) =
+            transpile(Statement::create_table(CreateTableStatement::new("events").columns([
+                col("id", ColumnType::UInt64),
+                col("name", ColumnType::LowCardinalityString),
+                col("event_time", ColumnType::datetime64(3)),
+                col("tag", ColumnType::fixed_string(16)),
+            ])));
+        assert_eq!(
+            sql,
+            "CREATE TABLE events (id UBIGINT NOT NULL, name VARCHAR NOT NULL, event_time TIMESTAMP NOT NULL, tag CHAR(16) NOT NULL)"
+        );
         assert!(params.is_empty());
     }
 
     #[test]
     fn test_aggregate_state_column_maps_to_result_type() {
         let (sql, params) = transpile(Statement::create_table(
-            CreateTableStatement::new("events_by_minute")
-                .columns([
-                    col("count", ColumnType::aggregate_state(AggregateFn::count(), [ColumnType::UInt64])),
-                    col("duration_avg", ColumnType::aggregate_state(AggregateFn::avg(), [ColumnType::Float64])),
-                    col("duration_p95", ColumnType::aggregate_state(AggregateFn::quantile(0.95), [ColumnType::Float64])),
-                ]),
+            CreateTableStatement::new("events_by_minute").columns([
+                col(
+                    "count",
+                    ColumnType::aggregate_state(AggregateFn::count(), [ColumnType::UInt64]),
+                ),
+                col(
+                    "duration_avg",
+                    ColumnType::aggregate_state(AggregateFn::avg(), [ColumnType::Float64]),
+                ),
+                col(
+                    "duration_p95",
+                    ColumnType::aggregate_state(AggregateFn::quantile(0.95), [ColumnType::Float64]),
+                ),
+            ]),
         ));
-        assert_eq!(sql, "CREATE TABLE events_by_minute (count UBIGINT NOT NULL, duration_avg DOUBLE NOT NULL, duration_p95 DOUBLE NOT NULL)");
+        assert_eq!(
+            sql,
+            "CREATE TABLE events_by_minute (count UBIGINT NOT NULL, duration_avg DOUBLE NOT NULL, duration_p95 DOUBLE NOT NULL)"
+        );
         assert!(params.is_empty());
     }
 
@@ -1040,13 +1142,13 @@ mod tests {
 
     #[test]
     fn test_state_merge_emit_plain_function() {
-        let (sql, params) = transpile(Statement::select(
-            SelectStatement::new("events")
-                .projections([
-                    Projection::aggregate(AggregateFunction::state(AggregateFunction::count_all())),
-                    Projection::aggregate(AggregateFunction::merge(AggregateFunction::avg("duration_ms"))),
-                ]),
-        ));
+        let (sql, params) =
+            transpile(Statement::select(SelectStatement::new("events").projections([
+                Projection::aggregate(AggregateFunction::state(AggregateFunction::count_all())),
+                Projection::aggregate(AggregateFunction::merge(AggregateFunction::avg(
+                    "duration_ms",
+                ))),
+            ])));
         assert_eq!(sql, "SELECT CAST(COUNT(*) AS UBIGINT), ANY_VALUE(duration_ms) FROM events");
         assert!(params.is_empty());
     }
@@ -1058,12 +1160,15 @@ mod tests {
                 .projections([
                     Projection::column("tenant_id"),
                     Projection::column("bucket"),
-                    Projection::aggregate(
-                        AggregateFunction::merge(AggregateFunction::quantile(0.5, "latency_p50"))
-                    ).alias("latency_p50"),
-                    Projection::aggregate(
-                        AggregateFunction::merge(AggregateFunction::sum("latency_sum"))
-                    ).alias("latency_sum"),
+                    Projection::aggregate(AggregateFunction::merge(AggregateFunction::quantile(
+                        0.5,
+                        "latency_p50",
+                    )))
+                    .alias("latency_p50"),
+                    Projection::aggregate(AggregateFunction::merge(AggregateFunction::sum(
+                        "latency_sum",
+                    )))
+                    .alias("latency_sum"),
                 ])
                 .group_by(["tenant_id", "bucket"]),
         ));
@@ -1082,10 +1187,13 @@ mod tests {
                 .projections([
                     Projection::column("tenant_id"),
                     Projection::column("step"),
-                    Projection::aggregate(
-                        AggregateFunction::merge(AggregateFunction::quantile(0.5, "latency_p50"))
-                    ).alias("latency_p50"),
-                    Projection::aggregate(AggregateFunction::sum("latency_sum")).alias("latency_sum"),
+                    Projection::aggregate(AggregateFunction::merge(AggregateFunction::quantile(
+                        0.5,
+                        "latency_p50",
+                    )))
+                    .alias("latency_p50"),
+                    Projection::aggregate(AggregateFunction::sum("latency_sum"))
+                        .alias("latency_sum"),
                     Projection::aggregate(AggregateFunction::count_all()).alias("event_count"),
                 ])
                 .group_by(["tenant_id", "step"]),
@@ -1101,18 +1209,13 @@ mod tests {
     #[test]
     fn test_merge_projections_no_group_by() {
         let (sql, params) = transpile(Statement::select(
-            SelectStatement::new("crawl_log_latency")
-                .projections([
-                    Projection::aggregate(
-                        AggregateFunction::merge(AggregateFunction::sum("latency_sum"))
-                    ).alias("latency_sum"),
-                ]),
+            SelectStatement::new("crawl_log_latency").projections([Projection::aggregate(
+                AggregateFunction::merge(AggregateFunction::sum("latency_sum")),
+            )
+            .alias("latency_sum")]),
         ));
 
-        assert_eq!(
-            sql,
-            "SELECT ANY_VALUE(latency_sum) AS latency_sum FROM crawl_log_latency",
-        );
+        assert_eq!(sql, "SELECT ANY_VALUE(latency_sum) AS latency_sum FROM crawl_log_latency",);
         assert!(params.is_empty());
     }
 
@@ -1129,11 +1232,11 @@ mod tests {
     fn test_time_bucket() {
         let (sql, _) = transpile(Statement::select(
             SelectStatement::new("crawl_log_metrics")
-                .projections([
-                    Projection::expr(
-                        Expression::time_bucket(Interval::minutes(5), "bucket")
-                    ).alias("bucket"),
-                ])
+                .projections([Projection::expr(Expression::time_bucket(
+                    Interval::minutes(5),
+                    "bucket",
+                ))
+                .alias("bucket")])
                 .group_by(["bucket"]),
         ));
         assert_eq!(
@@ -1144,11 +1247,14 @@ mod tests {
 
     #[test]
     fn test_quantile_maps_to_percentile_cont() {
-        let (sql, params) = transpile(Statement::select(
-            SelectStatement::new("events")
-                .projections([Projection::aggregate(AggregateFunction::quantile(0.95, "duration_ms"))]),
-        ));
-        assert_eq!(sql, "SELECT PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY duration_ms) FROM events");
+        let (sql, params) =
+            transpile(Statement::select(SelectStatement::new("events").projections([
+                Projection::aggregate(AggregateFunction::quantile(0.95, "duration_ms")),
+            ])));
+        assert_eq!(
+            sql,
+            "SELECT PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY duration_ms) FROM events"
+        );
         assert!(params.is_empty());
     }
 }

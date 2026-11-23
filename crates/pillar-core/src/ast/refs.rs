@@ -1,6 +1,5 @@
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
-
 /// A reference to a table or view in a query, optionally with an alias.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TableRef {

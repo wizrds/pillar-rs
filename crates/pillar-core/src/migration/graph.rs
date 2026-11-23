@@ -2,7 +2,6 @@ use std::collections::{HashMap, HashSet};
 
 use crate::migration::traits::MigrationRef;
 
-
 /// A directed graph of migration revision relationships.
 pub struct RevisionGraph {
     /// Maps each revision ID to the IDs of its child revisions.
@@ -62,7 +61,8 @@ impl RevisionGraph {
     /// Returns the ordered revision IDs along the upgrade path from `from` to `to`, or `None` if no path exists.
     pub fn find_up_path(&self, from: &str, to: &str) -> Option<Vec<String>> {
         self.find_path(from, to, |graph, node| {
-            graph.children
+            graph
+                .children
                 .get(node)
                 .cloned()
                 .unwrap_or_default()
@@ -72,14 +72,14 @@ impl RevisionGraph {
     /// Returns the ordered revision IDs along the downgrade path from `from` to `to`, or `None` if no path exists.
     pub fn find_down_path(&self, from: &str, to: &str) -> Option<Vec<String>> {
         self.find_path(from, to, |graph, node| {
-            graph.parents
+            graph
+                .parents
                 .get(node)
                 .map(|p| vec![p.clone()])
                 .unwrap_or_default()
         })
     }
 }
-
 
 /// An ordered chain of migrations with graph-based path resolution.
 pub struct RevisionChain {
@@ -131,13 +131,21 @@ impl RevisionChain {
     pub fn upgrade_path(&self, from: &str, to: &str) -> Option<Vec<&MigrationRef>> {
         self.graph
             .find_up_path(from, to)
-            .map(|ids| ids.iter().filter_map(|id| self.get(id)).collect())
+            .map(|ids| {
+                ids.iter()
+                    .filter_map(|id| self.get(id))
+                    .collect()
+            })
     }
 
     /// Returns the ordered migrations along the downgrade path from `from` to `to`.
     pub fn downgrade_path(&self, from: &str, to: &str) -> Option<Vec<&MigrationRef>> {
         self.graph
             .find_down_path(from, to)
-            .map(|ids| ids.iter().filter_map(|id| self.get(id)).collect())
+            .map(|ids| {
+                ids.iter()
+                    .filter_map(|id| self.get(id))
+                    .collect()
+            })
     }
 }

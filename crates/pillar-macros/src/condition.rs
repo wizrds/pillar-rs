@@ -1,7 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
-
 pub fn parse_condition(input: &str) -> syn::Result<TokenStream> {
     let input = input.trim();
 
@@ -49,13 +48,15 @@ const OPERATORS: &[(&str, &str)] = &[
     (">=", "gte"),
     ("<=", "lte"),
     ("!=", "ne"),
-    ("=",  "eq"),
-    (">",  "gt"),
-    ("<",  "lt"),
+    ("=", "eq"),
+    (">", "gt"),
+    ("<", "lt"),
 ];
 
 fn split_binary<'a>(input: &'a str, op: &str) -> Option<(&'a str, &'a str)> {
-    input.find(op).map(|pos| (&input[..pos], &input[pos + op.len()..]))
+    input
+        .find(op)
+        .map(|pos| (&input[..pos], &input[pos + op.len()..]))
 }
 
 fn parse_value(s: &str) -> syn::Result<TokenStream> {

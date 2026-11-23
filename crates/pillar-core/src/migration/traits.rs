@@ -2,19 +2,13 @@ use async_trait::async_trait;
 
 use crate::{
     ast::{
-        AlterTableStatement,
-        CreateMaterializedViewStatement,
-        CreateTableStatement,
-        CreateViewStatement,
-        DropTableStatement,
-        DropViewStatement,
-        Statement,
+        AlterTableStatement, CreateMaterializedViewStatement, CreateTableStatement,
+        CreateViewStatement, DropTableStatement, DropViewStatement, Statement,
     },
-    errors::Error,
     database::{AsDynDatabase, Database},
+    errors::Error,
     types::ExecutionResult,
 };
-
 
 /// Executes DDL statements against a database reference within a migration.
 pub struct MigrateOp<'a> {
@@ -56,7 +50,10 @@ impl<'a> MigrateOp<'a> {
     }
 
     /// Executes a [`CreateMaterializedViewStatement`](crate::ast::CreateMaterializedViewStatement).
-    pub async fn create_materialized_view(&self, stmt: CreateMaterializedViewStatement) -> Result<ExecutionResult, Error> {
+    pub async fn create_materialized_view(
+        &self,
+        stmt: CreateMaterializedViewStatement,
+    ) -> Result<ExecutionResult, Error> {
         self.database
             .execute(&Statement::CreateMaterializedView(stmt))
             .await
@@ -71,12 +68,9 @@ impl<'a> MigrateOp<'a> {
 
     /// Executes an arbitrary [`Statement`](crate::ast::Statement).
     pub async fn execute(&self, statement: &Statement) -> Result<ExecutionResult, Error> {
-        self.database
-            .execute(statement)
-            .await
+        self.database.execute(statement).await
     }
 }
-
 
 /// A single database migration with upgrade and downgrade operations.
 #[async_trait]
@@ -108,7 +102,6 @@ pub enum MigrationDirection {
     /// Revert migrations.
     Down,
 }
-
 
 /// Provides upgrade and downgrade operations on a database.
 #[async_trait]

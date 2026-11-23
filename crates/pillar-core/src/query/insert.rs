@@ -1,14 +1,9 @@
 use crate::{
-    ast::{
-        InsertStatement,
-        Statement,
-        TableRef,
-    },
+    ast::{InsertStatement, Statement, TableRef},
     database::Database,
     errors::Error,
     model::Model,
 };
-
 
 /// A builder for an `INSERT` statement targeting a [`Model`] table.
 #[derive(Debug, Clone)]
@@ -26,7 +21,11 @@ impl<M: Model> Insert<M> {
 
         Ok(Self {
             statement: InsertStatement::new(TableRef::new(M::table_name()))
-                .columns(M::columns().iter().map(|col| col.name.to_string()))
+                .columns(
+                    M::columns()
+                        .iter()
+                        .map(|col| col.name.to_string()),
+                )
                 .values(models.iter().map(|m| m.to_row())),
             _marker: std::marker::PhantomData,
         })
@@ -44,11 +43,9 @@ impl<M: Model> Insert<M> {
 
     /// Executes the insert and returns the number of rows affected.
     pub async fn execute<D: Database>(self, database: &D) -> Result<usize, Error> {
-        Ok(
-            database
-                .execute(&self.into_statement())
-                .await?
-                .rows_affected
-        )
+        Ok(database
+            .execute(&self.into_statement())
+            .await?
+            .rows_affected)
     }
 }

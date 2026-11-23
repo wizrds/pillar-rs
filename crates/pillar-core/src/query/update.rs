@@ -1,17 +1,11 @@
 use crate::{
-    ast::{
-        ColumnRef,
-        Statement,
-        TableRef,
-        UpdateStatement,
-    },
+    ast::{ColumnRef, Statement, TableRef, UpdateStatement},
     condition::{Condition, ConditionExpression},
     database::Database,
     errors::Error,
     model::Model,
     value::Value,
 };
-
 
 /// A builder for an `UPDATE` statement targeting a [`Model`] table.
 #[derive(Debug, Clone)]
@@ -31,7 +25,9 @@ impl<M: Model> Update<M> {
 
     /// Appends a column/value assignment.
     pub fn set(mut self, column: impl Into<ColumnRef>, value: impl Into<Value>) -> Self {
-        self.statement.set.push((column.into(), value.into()));
+        self.statement
+            .set
+            .push((column.into(), value.into()));
         self
     }
 
@@ -77,12 +73,10 @@ impl<M: Model> Update<M> {
 
     /// Executes the update and returns the number of rows affected.
     pub async fn execute<D: Database>(self, database: &D) -> Result<usize, Error> {
-        Ok(
-            database
-                .execute(&self.into_statement())
-                .await?
-                .rows_affected
-        )
+        Ok(database
+            .execute(&self.into_statement())
+            .await?
+            .rows_affected)
     }
 }
 

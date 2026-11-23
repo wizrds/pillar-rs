@@ -9,7 +9,6 @@ use crate::column::{column_struct, columns_body};
 use crate::condition::parse_condition;
 use crate::from_batch;
 
-
 pub fn derive(input: DeriveInput) -> TokenStream {
     match ViewAttrs::from_derive_input(&input) {
         Err(e) => e.write_errors(),
@@ -18,12 +17,18 @@ pub fn derive(input: DeriveInput) -> TokenStream {
 }
 
 fn impl_view(attrs: ViewAttrs) -> syn::Result<TokenStream> {
-    let view_name = attrs.view
+    let view_name = attrs
+        .view
         .as_deref()
         .map(str::to_owned)
         .unwrap_or_else(|| attrs.ident.to_string().to_snake_case());
 
-    let fields = attrs.data.clone().take_struct().unwrap().fields;
+    let fields = attrs
+        .data
+        .clone()
+        .take_struct()
+        .unwrap()
+        .fields;
 
     let view = view_struct(&view_name, &fields, &attrs)?;
     let columns = column_struct(&fields)?;
@@ -36,12 +41,19 @@ fn impl_view(attrs: ViewAttrs) -> syn::Result<TokenStream> {
     })
 }
 
-fn view_struct(view_name: &str, fields: &[FieldAttrs], attrs: &ViewAttrs) -> syn::Result<TokenStream> {
-    let struct_fields = fields.iter().filter(|f| !f.skip).map(|f| {
-        let ident = f.ident.as_ref().unwrap();
-        let ty = &f.ty;
-        quote! { pub #ident: #ty }
-    });
+fn view_struct(
+    view_name: &str,
+    fields: &[FieldAttrs],
+    attrs: &ViewAttrs,
+) -> syn::Result<TokenStream> {
+    let struct_fields = fields
+        .iter()
+        .filter(|f| !f.skip)
+        .map(|f| {
+            let ident = f.ident.as_ref().unwrap();
+            let ty = &f.ty;
+            quote! { pub #ident: #ty }
+        });
 
     let columns_body = columns_body(fields)?;
     let view_query_impl = view_query_impl(fields, attrs)?;
@@ -83,29 +95,41 @@ fn view_query_impl(fields: &[FieldAttrs], attrs: &ViewAttrs) -> syn::Result<Toke
         None => return Ok(quote! {}),
     };
 
-    let has_aggregates = fields.iter().any(|f| !f.skip && f.aggregate.is_some());
+    let has_aggregates = fields
+        .iter()
+        .any(|f| !f.skip && f.aggregate.is_some());
 
-    let projections = fields.iter().filter(|f| !f.skip).map(|f| {
-        let col_name = f.column.as_deref()
-            .map(str::to_owned)
-            .unwrap_or_else(|| f.ident.as_ref().unwrap().to_string());
-
-        match &f.aggregate {
-            None => quote! { ::pillar::ast::Projection::column(#col_name.to_string()) },
-            Some(op) => {
-                let source = f.source.as_deref().unwrap_or(&col_name);
-                aggregate_projection(op, source)
-            }
-        }
-    });
-
-    let group_by = if has_aggregates {
-        let keys = fields.iter().filter(|f| !f.skip && f.aggregate.is_none()).map(|f| {
-            let name = f.column.as_deref()
+    let projections = fields
+        .iter()
+        .filter(|f| !f.skip)
+        .map(|f| {
+            let col_name = f
+                .column
+                .as_deref()
                 .map(str::to_owned)
                 .unwrap_or_else(|| f.ident.as_ref().unwrap().to_string());
-            quote! { #name.to_string() }
+
+            match &f.aggregate {
+                None => quote! { ::pillar::ast::Projection::column(#col_name.to_string()) },
+                Some(op) => {
+                    let source = f.source.as_deref().unwrap_or(&col_name);
+                    aggregate_projection(op, source)
+                }
+            }
         });
+
+    let group_by = if has_aggregates {
+        let keys = fields
+            .iter()
+            .filter(|f| !f.skip && f.aggregate.is_none())
+            .map(|f| {
+                let name = f
+                    .column
+                    .as_deref()
+                    .map(str::to_owned)
+                    .unwrap_or_else(|| f.ident.as_ref().unwrap().to_string());
+                quote! { #name.to_string() }
+            });
         quote! { .group_by(vec![#(#keys),*]) }
     } else {
         quote! {}
@@ -168,16 +192,22 @@ fn view_schema_impl(fields: &[FieldAttrs], attrs: &ViewAttrs) -> syn::Result<Tok
         || attrs.to.is_some()
         || attrs.engine.is_some()
         || attrs.partition_by.is_some()
-        || attrs.options.as_ref().map(|o| !o.is_empty()).unwrap_or(false);
+        || attrs
+            .options
+            .as_ref()
+            .map(|o| !o.is_empty())
+            .unwrap_or(false);
 
     if !has_ddl {
         return Ok(quote! {});
     }
 
-    let order_by_fields: Vec<String> = fields.iter()
+    let order_by_fields: Vec<String> = fields
+        .iter()
         .filter(|f| !f.skip && f.order_by)
         .map(|f| {
-            f.column.as_deref()
+            f.column
+                .as_deref()
                 .map(str::to_owned)
                 .unwrap_or_else(|| f.ident.as_ref().unwrap().to_string())
         })

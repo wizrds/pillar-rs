@@ -1,14 +1,10 @@
 use crate::{
-    value::Value,
     ast::{
-        duration::Interval,
-        refs::ColumnRef,
-        schema::ColumnType,
+        duration::Interval, refs::ColumnRef, schema::ColumnType, select::SelectStatement,
         window::WindowFunction,
-        select::SelectStatement,
     },
+    value::Value,
 };
-
 
 /// An aggregate function used in a [`Projection`](crate::ast::Projection) or [`Expression`](crate::ast::Expression).
 #[derive(Debug, Clone, PartialEq)]
@@ -153,10 +149,7 @@ pub enum Expression {
         right: Box<Expression>,
     },
     /// A scalar function call.
-    Function {
-        name: String,
-        args: Vec<Expression>,
-    },
+    Function { name: String, args: Vec<Expression> },
     /// A `CASE` expression with optional operand and `ELSE` branch.
     Case {
         operand: Option<Box<Expression>>,
@@ -201,7 +194,10 @@ impl Expression {
     ) -> Self {
         Self::Function {
             name: name.into(),
-            args: args.into_iter().map(Into::into).collect(),
+            args: args
+                .into_iter()
+                .map(Into::into)
+                .collect(),
         }
     }
 
@@ -321,7 +317,8 @@ impl CaseBuilder {
 
     /// Adds a `WHEN ... THEN ...` branch.
     pub fn when(mut self, when: impl Into<Expression>, then: impl Into<Expression>) -> Self {
-        self.when_then.push((when.into(), then.into()));
+        self.when_then
+            .push((when.into(), then.into()));
         self
     }
 

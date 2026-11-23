@@ -3,19 +3,19 @@
 #[allow(unused_extern_crates)]
 extern crate self as pillar_core;
 
-pub mod errors;
-pub mod convert;
-pub mod types;
 pub mod ast;
-pub mod value;
-pub mod condition;
 pub mod column;
-pub mod dialect;
-pub mod model;
-pub mod view;
+pub mod condition;
+pub mod convert;
 pub mod database;
-pub mod query;
+pub mod dialect;
+pub mod errors;
 pub mod migration;
+pub mod model;
+pub mod query;
+pub mod types;
+pub mod value;
+pub mod view;
 
 #[doc(hidden)]
 pub mod __private {

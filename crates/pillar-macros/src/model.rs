@@ -9,7 +9,6 @@ use crate::column::{column_info, column_struct, columns_body};
 use crate::from_batch;
 use crate::to_row;
 
-
 pub fn derive(input: DeriveInput) -> TokenStream {
     match ModelAttrs::from_derive_input(&input) {
         Err(e) => e.write_errors(),
@@ -18,12 +17,18 @@ pub fn derive(input: DeriveInput) -> TokenStream {
 }
 
 fn impl_model(attrs: ModelAttrs) -> syn::Result<TokenStream> {
-    let table_name = attrs.table
+    let table_name = attrs
+        .table
         .as_deref()
         .map(str::to_owned)
         .unwrap_or_else(|| attrs.ident.to_string().to_snake_case());
 
-    let fields = attrs.data.clone().take_struct().unwrap().fields;
+    let fields = attrs
+        .data
+        .clone()
+        .take_struct()
+        .unwrap()
+        .fields;
 
     let model = model_struct(&table_name, &fields)?;
     let columns = column_struct(&fields)?;
@@ -37,11 +42,14 @@ fn impl_model(attrs: ModelAttrs) -> syn::Result<TokenStream> {
 }
 
 fn model_struct(table_name: &str, fields: &[FieldAttrs]) -> syn::Result<TokenStream> {
-    let struct_fields = fields.iter().filter(|f| !f.skip).map(|f| {
-        let ident = f.ident.as_ref().unwrap();
-        let ty = &f.ty;
-        quote! { pub #ident: #ty }
-    });
+    let struct_fields = fields
+        .iter()
+        .filter(|f| !f.skip)
+        .map(|f| {
+            let ident = f.ident.as_ref().unwrap();
+            let ty = &f.ty;
+            quote! { pub #ident: #ty }
+        });
 
     let columns_body = columns_body(fields)?;
 
@@ -93,28 +101,41 @@ fn model_struct(table_name: &str, fields: &[FieldAttrs]) -> syn::Result<TokenStr
     })
 }
 
-fn table_schema_impl(table_name: &str, fields: &[FieldAttrs], attrs: &ModelAttrs) -> syn::Result<TokenStream> {
+fn table_schema_impl(
+    table_name: &str,
+    fields: &[FieldAttrs],
+    attrs: &ModelAttrs,
+) -> syn::Result<TokenStream> {
     let has_ddl = attrs.engine.is_some()
         || attrs.partition_by.is_some()
         || attrs.ttl.is_some()
-        || attrs.options.as_ref().map(|o| !o.is_empty()).unwrap_or(false)
+        || attrs
+            .options
+            .as_ref()
+            .map(|o| !o.is_empty())
+            .unwrap_or(false)
         || fields.iter().any(|f| f.order_by);
 
     if !has_ddl {
         return Ok(quote! {});
     }
 
-    let col_defs = fields.iter()
+    let col_defs = fields
+        .iter()
         .filter(|f| !f.skip)
         .map(|f| {
-            let col_name = f.column.as_deref()
+            let col_name = f
+                .column
+                .as_deref()
                 .map(str::to_owned)
                 .unwrap_or_else(|| f.ident.as_ref().unwrap().to_string());
 
             let (col_type, nullable) = if let Some(raw) = &f.column_type {
                 (
                     quote! { ::pillar::ast::ColumnType::Custom(#raw.to_string()) },
-                    column_info(&f.ty).map(|i| i.nullable).unwrap_or(false),
+                    column_info(&f.ty)
+                        .map(|i| i.nullable)
+                        .unwrap_or(false),
                 )
             } else {
                 let info = column_info(&f.ty)?;
@@ -135,10 +156,12 @@ fn table_schema_impl(table_name: &str, fields: &[FieldAttrs], attrs: &ModelAttrs
         })
         .collect::<syn::Result<Vec<_>>>()?;
 
-    let order_by_fields: Vec<String> = fields.iter()
+    let order_by_fields: Vec<String> = fields
+        .iter()
         .filter(|f| !f.skip && f.order_by)
         .map(|f| {
-            f.column.as_deref()
+            f.column
+                .as_deref()
                 .map(str::to_owned)
                 .unwrap_or_else(|| f.ident.as_ref().unwrap().to_string())
         })

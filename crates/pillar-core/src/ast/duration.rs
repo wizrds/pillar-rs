@@ -14,7 +14,11 @@ pub struct TtlClause {
 impl TtlClause {
     /// Creates a [`TtlClause`](crate::ast::TtlClause) that deletes rows after the given interval.
     pub fn delete(column: impl Into<ColumnRef>, interval: Interval) -> Self {
-        Self { column: column.into(), interval, action: TtlAction::Delete }
+        Self {
+            column: column.into(),
+            interval,
+            action: TtlAction::Delete,
+        }
     }
 }
 

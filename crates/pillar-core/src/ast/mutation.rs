@@ -1,12 +1,11 @@
 use crate::{
-    condition::ConditionExpression,
-    value::Value,
     ast::{
         refs::{ColumnRef, TableRef},
         select::{Projection, SelectStatement},
     },
+    condition::ConditionExpression,
+    value::Value,
 };
-
 
 /// Specifies which columns to target and what to do on a conflict in an [`InsertStatement`](crate::ast::InsertStatement).
 #[derive(Debug, Clone, PartialEq)]
@@ -23,7 +22,10 @@ impl OnConflict {
 
     /// Sets the conflict target columns.
     pub fn target(mut self, columns: impl IntoIterator<Item = impl Into<ColumnRef>>) -> Self {
-        self.target = columns.into_iter().map(Into::into).collect();
+        self.target = columns
+            .into_iter()
+            .map(Into::into)
+            .collect();
         self
     }
 }
@@ -52,7 +54,10 @@ impl OnConflictAction {
         V: Into<Value>,
     {
         Self::DoUpdate {
-            set: set.into_iter().map(|(k, v)| (k.into(), v.into())).collect(),
+            set: set
+                .into_iter()
+                .map(|(k, v)| (k.into(), v.into()))
+                .collect(),
             where_clause: None,
         }
     }
@@ -85,7 +90,11 @@ impl InsertBody {
     {
         Self::Values(
             rows.into_iter()
-                .map(|row| row.into_iter().map(Into::into).collect())
+                .map(|row| {
+                    row.into_iter()
+                        .map(Into::into)
+                        .collect()
+                })
                 .collect(),
         )
     }
@@ -120,7 +129,10 @@ impl InsertStatement {
 
     /// Sets the column names for the insert.
     pub fn columns(mut self, columns: impl IntoIterator<Item = impl Into<ColumnRef>>) -> Self {
-        self.columns = columns.into_iter().map(Into::into).collect();
+        self.columns = columns
+            .into_iter()
+            .map(Into::into)
+            .collect();
         self
     }
 
@@ -148,10 +160,7 @@ impl InsertStatement {
     }
 
     /// Sets the `RETURNING` clause.
-    pub fn returning(
-        mut self,
-        projections: impl IntoIterator<Item = Projection>,
-    ) -> Self {
+    pub fn returning(mut self, projections: impl IntoIterator<Item = Projection>) -> Self {
         self.returning = Some(projections.into_iter().collect());
         self
     }
@@ -181,7 +190,12 @@ pub struct UpdateStatement {
 impl UpdateStatement {
     /// Creates a new [`UpdateStatement`](crate::ast::UpdateStatement) targeting the given table.
     pub fn new(table: impl Into<TableRef>) -> Self {
-        Self { table: table.into(), set: Vec::new(), where_clause: None, returning: None }
+        Self {
+            table: table.into(),
+            set: Vec::new(),
+            where_clause: None,
+            returning: None,
+        }
     }
 
     /// Sets the column/value pairs to update.
@@ -191,7 +205,10 @@ impl UpdateStatement {
         K: Into<ColumnRef>,
         V: Into<Value>,
     {
-        self.set = set.into_iter().map(|(k, v)| (k.into(), v.into())).collect();
+        self.set = set
+            .into_iter()
+            .map(|(k, v)| (k.into(), v.into()))
+            .collect();
         self
     }
 
@@ -202,10 +219,7 @@ impl UpdateStatement {
     }
 
     /// Sets the `RETURNING` clause.
-    pub fn returning(
-        mut self,
-        projections: impl IntoIterator<Item = Projection>,
-    ) -> Self {
+    pub fn returning(mut self, projections: impl IntoIterator<Item = Projection>) -> Self {
         self.returning = Some(projections.into_iter().collect());
         self
     }
@@ -240,7 +254,11 @@ pub struct DeleteStatement {
 impl DeleteStatement {
     /// Creates a new [`DeleteStatement`](crate::ast::DeleteStatement) targeting the given table.
     pub fn new(table: impl Into<TableRef>) -> Self {
-        Self { table: table.into(), where_clause: None, returning: None }
+        Self {
+            table: table.into(),
+            where_clause: None,
+            returning: None,
+        }
     }
 
     /// Sets the WHERE clause.
@@ -250,10 +268,7 @@ impl DeleteStatement {
     }
 
     /// Sets the `RETURNING` clause.
-    pub fn returning(
-        mut self,
-        projections: impl IntoIterator<Item = Projection>,
-    ) -> Self {
+    pub fn returning(mut self, projections: impl IntoIterator<Item = Projection>) -> Self {
         self.returning = Some(projections.into_iter().collect());
         self
     }

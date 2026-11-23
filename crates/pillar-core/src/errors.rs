@@ -37,10 +37,7 @@ pub enum Error {
 impl Error {
     /// Creates an [`Error::Connection`](crate::errors::Error::Connection) with the given message.
     pub fn connection(message: impl Into<String>) -> Self {
-        Self::Connection {
-            message: message.into(),
-            source: None,
-        }
+        Self::Connection { message: message.into(), source: None }
     }
 
     /// Creates an [`Error::Connection`](crate::errors::Error::Connection) with the given source error.
@@ -56,10 +53,7 @@ impl Error {
 
     /// Creates an [`Error::InvalidQuery`](crate::errors::Error::InvalidQuery) with the given message.
     pub fn invalid_query(message: impl Into<String>) -> Self {
-        Self::InvalidQuery {
-            message: message.into(),
-            source: None,
-        }
+        Self::InvalidQuery { message: message.into(), source: None }
     }
 
     /// Creates an [`Error::InvalidQuery`](crate::errors::Error::InvalidQuery) with the given source error.
@@ -85,10 +79,7 @@ impl Error {
 
     /// Creates an [`Error::Unexpected`](crate::errors::Error::Unexpected) with the given message.
     pub fn unexpected(message: impl Into<String>) -> Self {
-        Self::Unexpected {
-            message: message.into(),
-            source: None,
-        }
+        Self::Unexpected { message: message.into(), source: None }
     }
 
     /// Creates an [`Error::Unexpected`](crate::errors::Error::Unexpected) with the given source error.

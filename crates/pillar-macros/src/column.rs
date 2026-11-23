@@ -3,7 +3,6 @@ use quote::quote;
 
 use crate::attr::FieldAttrs;
 
-
 pub fn columns_body(fields: &[FieldAttrs]) -> syn::Result<TokenStream> {
     let defs = fields
         .iter()
@@ -36,9 +35,17 @@ pub fn column_struct(fields: &[FieldAttrs]) -> syn::Result<TokenStream> {
 }
 
 fn column_def(field: &FieldAttrs) -> syn::Result<TokenStream> {
-    let name = field.column.as_deref()
+    let name = field
+        .column
+        .as_deref()
         .map(str::to_owned)
-        .unwrap_or_else(|| field.ident.as_ref().unwrap().to_string());
+        .unwrap_or_else(|| {
+            field
+                .ident
+                .as_ref()
+                .unwrap()
+                .to_string()
+        });
 
     let info = if let Some(raw) = &field.column_type {
         ColumnInfo {
@@ -67,7 +74,9 @@ fn column_def(field: &FieldAttrs) -> syn::Result<TokenStream> {
 
 fn typed_column_fn(field: &FieldAttrs) -> syn::Result<TokenStream> {
     let ident = field.ident.as_ref().unwrap();
-    let col_name = field.column.as_deref()
+    let col_name = field
+        .column
+        .as_deref()
         .map(str::to_owned)
         .unwrap_or_else(|| ident.to_string());
 
@@ -100,13 +109,21 @@ pub fn column_info(ty: &syn::Type) -> syn::Result<ColumnInfo> {
 }
 
 fn unwrap_option(ty: &syn::Type) -> Option<&syn::Type> {
-    let syn::Type::Path(type_path) = ty else { return None };
+    let syn::Type::Path(type_path) = ty else {
+        return None;
+    };
     let segment = type_path.path.segments.last()?;
 
-    if segment.ident != "Option" { return None }
+    if segment.ident != "Option" {
+        return None;
+    }
 
-    let syn::PathArguments::AngleBracketed(args) = &segment.arguments else { return None };
-    let syn::GenericArgument::Type(inner) = args.args.first()? else { return None };
+    let syn::PathArguments::AngleBracketed(args) = &segment.arguments else {
+        return None;
+    };
+    let syn::GenericArgument::Type(inner) = args.args.first()? else {
+        return None;
+    };
 
     Some(inner)
 }
@@ -156,9 +173,7 @@ fn vec_to_column_type(path: &syn::Path) -> syn::Result<TokenStream> {
     };
 
     match args.args.first() {
-        Some(syn::GenericArgument::Type(syn::Type::Path(inner)))
-            if inner.path.is_ident("u8") =>
-        {
+        Some(syn::GenericArgument::Type(syn::Type::Path(inner))) if inner.path.is_ident("u8") => {
             Ok(quote! { ::pillar::ast::ColumnType::Binary })
         }
         _ => Err(syn::Error::new_spanned(

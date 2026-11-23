@@ -1,11 +1,10 @@
-use std::sync::Arc;
 use arrow::{
     datatypes::{Schema, SchemaRef},
     record_batch::RecordBatch,
 };
+use std::sync::Arc;
 
 pub use crate::convert::FromArrow;
-
 
 /// The result of a query that returns rows, wrapping an Arrow [`RecordBatch`].
 pub struct QueryResult {
