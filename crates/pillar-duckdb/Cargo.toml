@@ -19,7 +19,7 @@ serde_json = { workspace = true }
 arrow = { workspace = true }
 futures = { workspace = true }
 
-duckdb = { version = "1.10502.0", features = ["vtab-arrow"] }
+duckdb = { version = "~1.20001.0", features = ["vtab-arrow"] }
 blocking = { version = "1.6" }
 
 chrono = { workspace = true, optional = true }

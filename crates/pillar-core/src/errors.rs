@@ -1,7 +1,5 @@
-use thiserror::Error;
-
 /// The error type returned by all pillar operations.
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// A failure to establish or use a database connection.
     #[error("connection error: {message}")]
@@ -45,14 +43,14 @@ impl Error {
         }
     }
 
-    /// Creates an [`Error::Connection`](crate::errors::Error::Connection) with the given message and source error.
-    pub fn sourced_connection(
-        message: impl Into<String>,
-        source: Option<impl Into<Box<dyn std::error::Error + Send + Sync>>>,
-    ) -> Self {
+    /// Creates an [`Error::Connection`](crate::errors::Error::Connection) with the given source error.
+    pub fn sourced_connection<E>(source: E) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
+    {
         Self::Connection {
-            message: message.into(),
-            source: source.map(Into::into),
+            message: source.to_string(),
+            source: Some(Box::new(source)),
         }
     }
 
@@ -64,14 +62,14 @@ impl Error {
         }
     }
 
-    /// Creates an [`Error::InvalidQuery`](crate::errors::Error::InvalidQuery) with the given message and source error.
-    pub fn sourced_invalid_query(
-        message: impl Into<String>,
-        source: Option<impl Into<Box<dyn std::error::Error + Send + Sync>>>,
-    ) -> Self {
+    /// Creates an [`Error::InvalidQuery`](crate::errors::Error::InvalidQuery) with the given source error.
+    pub fn sourced_invalid_query<E>(source: E) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
+    {
         Self::InvalidQuery {
-            message: message.into(),
-            source: source.map(Into::into),
+            message: source.to_string(),
+            source: Some(Box::new(source)),
         }
     }
 
@@ -93,14 +91,14 @@ impl Error {
         }
     }
 
-    /// Creates an [`Error::Unexpected`](crate::errors::Error::Unexpected) with the given message and source error.
-    pub fn sourced_unexpected(
-        message: impl Into<String>,
-        source: Option<impl Into<Box<dyn std::error::Error + Send + Sync>>>,
-    ) -> Self {
+    /// Creates an [`Error::Unexpected`](crate::errors::Error::Unexpected) with the given source error.
+    pub fn sourced_unexpected<E>(source: E) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
+    {
         Self::Unexpected {
-            message: message.into(),
-            source: source.map(Into::into),
+            message: source.to_string(),
+            source: Some(Box::new(source)),
         }
     }
 }
