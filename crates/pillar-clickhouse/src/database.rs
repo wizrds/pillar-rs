@@ -14,9 +14,7 @@ use pillar_core::{
     value::Value,
 };
 
-use crate::dialect::ClickHouseDialect;
-use crate::normalize::BatchNormalizer;
-
+use crate::{dialect::ClickHouseDialect, normalize::BatchNormalizer};
 
 /// A [`pillar_core::database::Database`](pillar_core::database::Database) implementation backed by ClickHouse.
 pub struct ClickHouseDatabase {
@@ -84,10 +82,10 @@ impl ClickHouseDatabase {
 
                 loop {
                     match cursor.next().await {
-                        Err(e) => return Some((Err(Error::connection(e.to_string())), (cursor, decoder, pending, true))),
+                        Err(e) => return Some((Err(Error::sourced_connection(e)), (cursor, decoder, pending, true))),
                         Ok(None) => {
                             return match decoder.finish() {
-                                Err(e) => Some((Err(Error::unexpected(e.to_string())), (cursor, decoder, pending, true))),
+                                Err(e) => Some((Err(Error::sourced_unexpected(e)), (cursor, decoder, pending, true))),
                                 Ok(()) => None,
                             };
                         }
@@ -96,7 +94,7 @@ impl ClickHouseDatabase {
 
                             while !buf.is_empty() {
                                 match decoder.decode(&mut buf) {
-                                    Err(e) => return Some((Err(Error::unexpected(e.to_string())), (cursor, decoder, pending, true))),
+                                    Err(e) => return Some((Err(Error::sourced_unexpected(e)), (cursor, decoder, pending, true))),
                                     Ok(Some(batch)) => pending.push_back(batch),
                                     Ok(None) => {}
                                 }
@@ -126,7 +124,7 @@ impl Database for ClickHouseDatabase {
             .execute()
             .await
             .map(|_| ExecutionResult { rows_affected: 0, metadata: None })
-            .map_err(|e| Error::connection(e.to_string()))
+            .map_err(Error::sourced_connection)
     }
 
     async fn query(&self, statement: &Statement) -> Result<QueryResult, Error> {
@@ -134,7 +132,7 @@ impl Database for ClickHouseDatabase {
 
         let cursor = Self::bind_params(self.client.query(&prepared.sql), &prepared.params)
             .fetch_bytes("ArrowStream")
-            .map_err(|e| Error::connection(e.to_string()))?;
+            .map_err(Error::sourced_connection)?;
 
         let batches = Self::decode_stream(cursor)
             .map(|r| r.and_then(|b| self.normalizer.normalize(b)))
@@ -148,7 +146,7 @@ impl Database for ClickHouseDatabase {
             1 => Ok(QueryResult::from(batches.into_iter().next().unwrap())),
             _ => arrow::compute::concat_batches(&batches[0].schema(), &batches)
                 .map(QueryResult::from)
-                .map_err(|e| Error::unexpected(e.to_string())),
+                .map_err(Error::sourced_unexpected),
         }
     }
 
@@ -162,7 +160,7 @@ impl Database for ClickHouseDatabase {
             Self::decode_stream(
                 Self::bind_params(self.client.query(&prepared.sql), &prepared.params)
                     .fetch_bytes("ArrowStream")
-                    .map_err(|e| Error::connection(e.to_string()))?,
+                    .map_err(Error::sourced_connection)?,
             )
             .map(|r| r.and_then(|b| self.normalizer.normalize(b)).map(QueryResult::from)),
         ))

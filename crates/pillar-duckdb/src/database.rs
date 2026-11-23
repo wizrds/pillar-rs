@@ -35,7 +35,7 @@ impl DuckDbDatabase {
         blocking::unblock(|| {
             duckdb::Connection::open_in_memory()
                 .map(DuckDbDatabase::from_connection)
-                .map_err(|e| Error::connection(e.to_string()))
+                .map_err(Error::sourced_connection)
         })
         .await
     }
@@ -45,7 +45,7 @@ impl DuckDbDatabase {
         blocking::unblock(|| {
             duckdb::Connection::open(path)
                 .map(DuckDbDatabase::from_connection)
-                .map_err(|e| Error::connection(e.to_string()))
+                .map_err(Error::sourced_connection)
         })
         .await
     }
@@ -68,7 +68,7 @@ impl Database for DuckDbDatabase {
                 guard
                     .execute_batch(&prepared.sql)
                     .map(|_| ExecutionResult { rows_affected: 0, metadata: None })
-                    .map_err(|e| Error::connection(e.to_string()))
+                    .map_err(Error::sourced_connection)
             } else {
                 guard
                     .execute(
@@ -76,7 +76,7 @@ impl Database for DuckDbDatabase {
                         duckdb::params_from_iter(prepared.params.iter().map(DuckDbValue::from)),
                     )
                     .map(|rows_affected| ExecutionResult { rows_affected, metadata: None })
-                    .map_err(|e| Error::connection(e.to_string()))
+                    .map_err(Error::sourced_connection)
             }
         })
         .await
@@ -93,7 +93,7 @@ impl Database for DuckDbDatabase {
 
             let mut stmt = guard
                 .prepare(&prepared.sql)
-                .map_err(|e| Error::connection(e.to_string()))?;
+                .map_err(Error::sourced_connection)?;
 
             let arrow = stmt
                 .query_arrow(duckdb::params_from_iter(
@@ -101,10 +101,10 @@ impl Database for DuckDbDatabase {
                         .iter()
                         .map(DuckDbValue::from),
                 ))
-                .map_err(|e| Error::connection(e.to_string()))?;
+                .map_err(Error::sourced_connection)?;
 
             concat_batches(&arrow.get_schema(), &arrow.collect::<Vec<_>>())
-                .map_err(|e| Error::unexpected(e.to_string()))
+                .map_err(Error::sourced_unexpected)
         })
         .await
         .and_then(|batch| self.normalizer.normalize(batch))
@@ -126,7 +126,7 @@ impl Database for DuckDbDatabase {
 
                 let mut stmt = guard
                     .prepare(&prepared.sql)
-                    .map_err(|e| Error::connection(e.to_string()))?;
+                    .map_err(Error::sourced_connection)?;
 
                 stmt.query_arrow(duckdb::params_from_iter(
                     prepared.params
@@ -134,7 +134,7 @@ impl Database for DuckDbDatabase {
                         .map(DuckDbValue::from),
                 ))
                 .map(|arrow| arrow.collect::<Vec<_>>())
-                .map_err(|e| Error::connection(e.to_string()))
+                .map_err(Error::sourced_connection)
             })
             .await?
             .into_iter()
