@@ -1,6 +1,20 @@
 # Changelog
 
 ---
+## [0.3.8](https://github.com/wizrds/pillar-rs/-/compare/0.3.7...0.3.8) - 2026-11-23
+
+### Bug Fixes
+
+- Bump toolchain version to 1.99 - ([4acba74](https://github.com/wizrds/pillar-rs/-/commit/4acba74ed027691e0e2a8241ac96c3651b81660c)) - Timothy Pogue
+- Retain originating errors in core error variants - ([b677053](https://github.com/wizrds/pillar-rs/-/commit/b67705396d434d8d711f261f3ab0651213af4943)) - Timothy Pogue
+- Bump duckdb and arrow to v60 - ([e2925c4](https://github.com/wizrds/pillar-rs/-/commit/e2925c4f7c50f85c6a8233a88f92c9ea44fe08bb)) - Timothy Pogue
+
+### Miscellaneous
+
+- Fix formatting - ([726b991](https://github.com/wizrds/pillar-rs/-/commit/726b991c2f73f7e1e8cac9d4ee35073a14c75feb)) - Timothy Pogue
+- Update CI and rust taskfile - ([73f0784](https://github.com/wizrds/pillar-rs/-/commit/73f07846121a3d5a92fc887d598f71ae2f85f3c0)) - Timothy Pogue
+- Fix devcontainer docker file - ([a8c9fb5](https://github.com/wizrds/pillar-rs/-/commit/a8c9fb5710e104835581e24563c786295fb70bcf)) - Timothy Pogue
+---
 ## [0.3.7](https://github.com/wizrds/pillar-rs/-/compare/0.3.6...0.3.7) - 2026-05-10
 
 ### Bug Fixes
